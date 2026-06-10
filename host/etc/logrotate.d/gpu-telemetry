@@ -1,0 +1,12 @@
+/var/log/gpu-telemetry.log {
+    weekly
+    rotate 4
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 root root
+    postrotate
+        systemctl reload-or-restart gpu-telemetry.service 2>/dev/null || true
+    endscript
+}

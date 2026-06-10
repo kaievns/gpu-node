@@ -1,0 +1,15 @@
+[Unit]
+Description=Kill running Steam game on Sunshine client disconnect (immediate + retry 20s later for race-during-launch)
+After=sunshine.service
+Wants=sunshine.service
+
+[Service]
+User=kai
+Group=kai
+Type=simple
+Restart=on-failure
+RestartSec=10
+ExecStart=/bin/bash -c 'journalctl -fu sunshine.service -n 0 -o cat --no-pager | while IFS= read -r line; do case "$line" in *"CLIENT DISCONNECTED"*) /usr/local/sbin/kill-running-game.sh; ( sleep 20; /usr/local/sbin/kill-running-game.sh ) & ;; esac; done'
+
+[Install]
+WantedBy=multi-user.target

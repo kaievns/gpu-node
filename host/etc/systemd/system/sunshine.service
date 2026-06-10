@@ -1,0 +1,19 @@
+[Unit]
+Description=Sunshine (Moonlight host) - KMS capture of gamescope-headless
+After=gamescope-headless.service network-online.target
+BindsTo=gamescope-headless.service
+
+[Service]
+User=kai
+Group=kai
+SupplementaryGroups=input video render
+Environment=HOME=/home/kai
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=PULSE_SERVER=unix:/run/user/1000/pulse/native
+ExecStart=/usr/bin/sunshine
+Restart=on-failure
+RestartSec=5
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target

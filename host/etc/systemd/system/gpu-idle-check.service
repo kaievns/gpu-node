@@ -1,0 +1,7 @@
+[Unit]
+Description=GPU node idle check (suspends box if idle in gaming mode)
+After=gaming-agent.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/gaming-agent/idle-check.sh

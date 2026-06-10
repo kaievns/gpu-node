@@ -1,0 +1,15 @@
+[Unit]
+Description=Gaming node agent (HTTP control plane on :8080)
+After=network-online.target k3s-agent.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gaming-agent
+Group=gaming-agent
+ExecStart=/usr/bin/python /opt/gaming-agent/agent.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

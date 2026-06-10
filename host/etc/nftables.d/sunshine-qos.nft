@@ -1,0 +1,12 @@
+#!/usr/sbin/nft -f
+# Mark Sunshine UDP egress with DSCP AF41 so wifi APs queue it in
+# WMM Video AC. Marking on the source avoids the OpenWrt routers
+# flow-offload bypass of mangle rules.
+table inet sunshine_qos
+delete table inet sunshine_qos
+table inet sunshine_qos {
+    chain output {
+        type filter hook output priority -150 ; policy accept ;
+        udp sport 47998-48010 ip dscp set af41 counter
+    }
+}

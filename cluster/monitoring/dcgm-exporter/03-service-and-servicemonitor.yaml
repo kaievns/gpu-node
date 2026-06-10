@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dcgm-exporter
+  namespace: gpu-node-system
+  labels:
+    app.kubernetes.io/name: dcgm-exporter
+spec:
+  clusterIP: None  # headless — ServiceMonitor scrapes pod-level via endpoints
+  selector:
+    app.kubernetes.io/name: dcgm-exporter
+  ports:
+    - name: metrics
+      port: 9400
+      targetPort: metrics
+      protocol: TCP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: dcgm-exporter
+  namespace: gpu-node-system
+  labels:
+    # REQUIRED so the kube-prometheus-stack Prometheus picks this up:
+    # the Prometheus CR's serviceMonitorSelector is {matchLabels: {release: prometheus-stack}}.
+    release: prometheus-stack
+    app.kubernetes.io/name: dcgm-exporter
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dcgm-exporter
+  namespaceSelector:
+    matchNames: ["gpu-node-system"]
+  endpoints:
+    - port: metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      honorLabels: true

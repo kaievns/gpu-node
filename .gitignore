@@ -1,0 +1,14 @@
+# Local-only system backup attic — raw live-host mirror, legacy experiment
+# artifacts, and machine-identity files (machine-id, disk UUIDs, last-sync
+# state). The curated, tracked copy of the host config payload lives in
+# host/ — see host/README.md and scripts/sync-from-host.sh.
+/backup/
+
+# Personal notes and superseded planning docs (the original build saga,
+# GPU purchase research, etc). Kept locally, not part of the public repo.
+/notes/
+
+# Misc
+.DS_Store
+*.swp
+__pycache__/

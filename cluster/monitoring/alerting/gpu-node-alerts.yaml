@@ -1,0 +1,120 @@
+# gpu-node Grafana alert rules.
+#
+# Lives in the Grafana Alerting engine (not the kube-prom-stack
+# Alertmanager — that's disabled in helm values).
+#
+# Applied via Grafana's provisioning API by `apply.py` in this directory.
+# apply.py sets `X-Disable-Provenance: true`, so you can fine-tune
+# thresholds in the UI without breaking re-applies — but a re-apply
+# overwrites UI edits; this file is the source of truth.
+#
+# Routing: everything goes through the Grafana notification-policy ROOT
+# receiver, which apply.py sets to "Kai Evans" (email hi@kaievans.co).
+# Careful: apply.py step 3 REPLACES the whole policy tree — see the
+# comment there.
+#
+# noDataState defaults to OK for every rule (override per-rule with
+# `noDataState: Alerting|NoData` if a future rule needs it). The box
+# sleeps by design — no metrics flow for most of a typical week, and
+# anything other than OK would spam NoData through the root policy on
+# every suspend. For the same reason there is deliberately NO up/down
+# alert: "asleep" and "down" look identical from Prometheus.
+
+folder:
+  uid: gpu-node-alerts
+  title: gpu-node alerts
+
+group:
+  name: gpu-node-hw
+  interval: 30s
+
+rules:
+  - uid: gpu-pump-rpm-low
+    title: Coolant pump RPM low
+    severity: critical
+    for: 1m
+    summary: "Coolant pump on gpu-node is reporting <2000 RPM (normal ~2700)"
+    description: |
+      The Alphacool DC-LT pump on nct6798 fan5 / AIO_PUMP header is below
+      2000 RPM (it runs ~2700 pinned at 100% PWM — never curved). Below
+      ~1500 the loop won't move enough water, and CPU and GPU share the
+      one loop, so both overheat within minutes. Likely causes: dead pump,
+      stuck impeller (air bubble), or cable disconnect. Run `sensors` on
+      the host and check fan5 directly. If the box is asleep or down this
+      won't fire — that's intentional (noDataState=OK; the box sleeps by
+      design, and there is deliberately no up/down alert).
+    query: 'node_hwmon_fan_rpm{chip="platform_nct6775_656",sensor="fan5"}'
+    condition: { type: lt, value: 2000 }
+
+  - uid: gpu-coolant-high
+    title: Coolant temperature high
+    severity: warning
+    for: 5m
+    summary: "Coolant >50°C for 5 min on gpu-node"
+    description: |
+      Water-loop temperature (asusec T_Sensor / temp4) has been >50°C for
+      5 minutes. The loop is designed to run ~38-45°C under load; >50
+      suggests either a sustained heavy workload pushing the radiator's
+      limit, fans not ramping (check the watercurve in CoolerControl),
+      or pump issues (see the pump alert).
+    query: 'node_hwmon_temp_celsius{chip="platform_asus_ec_sensors",sensor="temp4"}'
+    condition: { type: gt, value: 50 }
+
+  - uid: gpu-temp-high
+    title: GPU die temp critical
+    severity: critical
+    for: 2m
+    summary: "GPU die >85°C for 2 min on gpu-node"
+    description: |
+      RTX 3080 die temp (DCGM_FI_DEV_GPU_TEMP) above 85°C. Hardware
+      thermal-throttle starts ~83°C; sustained 85+ = throttling +
+      lifetime degradation. With water cooling this only happens if
+      the loop has failed — post-repad, sustained 350W compute holds
+      60-62°C edge.
+    query: 'DCGM_FI_DEV_GPU_TEMP'
+    condition: { type: gt, value: 85 }
+
+  # Requires the custom counter set (../dcgm-exporter/04-custom-counters.yaml)
+  # — DCGM_FI_DEV_THERMAL_VIOLATION is not in the exporter's default CSV.
+  # Until 04 + 02 are applied, this rule sits at OK on no-data.
+  - uid: gpu-thermal-violation
+    title: GPU thermal throttling active
+    severity: warning
+    for: 5m
+    summary: "GPU is spending time thermal-throttling (THERMAL_VIOLATION counter rising)"
+    description: |
+      GPU is actively thermal-throttling; on this card with die temp <70C
+      that means GDDR6X junction heat-soak (see
+      docs/lessons/xid79-gddr6x-heat-soak.md). DCGM_FI_DEV_MEMORY_TEMP is
+      constant 0 on consumer Ampere, so a rising THERMAL_VIOLATION counter
+      (with bit 0x20 set in DCGM_FI_DEV_CLOCKS_EVENT_REASONS) is the only
+      software-visible signature of the failure mode that produced this
+      box's Xid 79 crashes. If this fires under sustained compute, check
+      the GPU-compartment intake fan and case airflow before blaming
+      software. max(rate(...)) because DCGM series carry the labels of
+      whichever pod holds the GPU.
+    query: 'max(rate(DCGM_FI_DEV_THERMAL_VIOLATION[10m]))'
+    condition: { type: gt, value: 0 }
+
+  - uid: gpu-xid-error
+    title: GPU Xid error reported
+    severity: critical
+    for: 1m
+    summary: "NVIDIA driver reported an Xid error on gpu-node (alert value = last Xid code)"
+    description: |
+      DCGM_FI_DEV_XID_ERRORS holds the most recent Xid error code
+      (0 = none), so the alert VALUE is the Xid code itself. 79 = "GPU has
+      fallen off the bus" — this box's historical failure mode (GDDR6X
+      heat-soak, docs/lessons/xid79-gddr6x-heat-soak.md). Whatever the
+      code: the driver hit a serious error. Check `journalctl -k | grep -i
+      xid` on the host and the 1 Hz gpu-telemetry log
+      (/var/log/gpu-telemetry/) for the lead-up. max() because DCGM series
+      carry the namespace/pod labels of whichever pod holds the GPU.
+    query: 'max(DCGM_FI_DEV_XID_ERRORS)'
+    condition: { type: gt, value: 0 }
+
+# NOTE: there is intentionally no DCGM_FI_DEV_MEMORY_TEMP rule. The old
+# gpu-mem-junction-high (>95°C) was removed: that metric reads a constant 0
+# on consumer Ampere (NVML doesn't expose memory junction), so the rule
+# could never fire — false confidence on the exact failure mode that bit
+# this box. gpu-thermal-violation above is the working replacement.

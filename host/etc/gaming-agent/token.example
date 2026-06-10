@@ -1,0 +1,13 @@
+# DO NOT commit a populated /etc/gaming-agent/token file.
+#
+# This token authenticates k8s controller -> host-side gaming-agent.
+# Generate once and place both in:
+#   /etc/gaming-agent/token  (on gpu-node, mode 640 root:gaming-agent)
+#   k8s Secret gpu-node-controller-secret.agent-token (in gpu-node-system ns)
+#
+#   AGENT_TOKEN=$(openssl rand -hex 32)
+#   echo "$AGENT_TOKEN" | sudo tee /etc/gaming-agent/token
+#   sudo chown root:gaming-agent /etc/gaming-agent/token
+#   sudo chmod 640 /etc/gaming-agent/token
+#   kubectl -n gpu-node-system create secret generic gpu-node-controller-secret \
+#     --from-literal=agent-token="$AGENT_TOKEN"

@@ -1,0 +1,4 @@
+mirrors:
+  registry.homelab:
+    endpoint:
+      - http://172.16.1.89/v2

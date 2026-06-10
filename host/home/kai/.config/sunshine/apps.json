@@ -1,0 +1,13 @@
+{
+    "env": {},
+    "apps": [
+        {
+            "name": "Steam Big Picture",
+            "detached": [
+                "steam steam://open/bigpicture"
+            ],
+            "image-path": "/usr/share/sunshine/steam.png",
+            "prep-cmd": []
+        }
+    ]
+}
