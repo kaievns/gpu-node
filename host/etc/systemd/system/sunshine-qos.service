@@ -1,0 +1,12 @@
+[Unit]
+Description=Sunshine QoS DSCP marking
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/nft -f /etc/nftables.d/sunshine-qos.nft
+ExecStop=/usr/bin/nft delete table inet sunshine_qos
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

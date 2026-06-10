@@ -1,0 +1,55 @@
+# NVIDIA k8s-device-plugin DaemonSet for gpu-node.
+# Captured as a manifest so it can be re-applied via
+# rehydrate/cluster/20-device-plugin.
+#
+# Key customizations vs the upstream NVIDIA manifest:
+#   - tolerates ALL THREE gpu-node taints, including the dynamic
+#     mode=gaming one. The device plugin must come up regardless of which
+#     mode the node is in when it (re)joins — without it, nvidia.com/gpu
+#     capacity never registers and compute pods stay Pending forever.
+#   - nodeSelector: gpu.model=rtx3080 (only schedules on gpu-node)
+#   - runtimeClassName: nvidia (so the runtime injects /dev/nvidia* + libs)
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: nvidia
+handler: nvidia
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-device-plugin-daemonset
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      name: nvidia-device-plugin-ds
+  template:
+    metadata:
+      labels:
+        name: nvidia-device-plugin-ds
+    spec:
+      priorityClassName: system-node-critical
+      tolerations:
+        - {key: nvidia.com/gpu,  operator: Exists, effect: NoSchedule}
+        - {key: gpu,             operator: Equal, value: "true", effect: NoSchedule}
+        - {key: dynamic-node,    operator: Equal, value: "true", effect: NoSchedule}
+        - {key: mode,            operator: Equal, value: "gaming", effect: NoSchedule}
+      nodeSelector:
+        gpu.model: rtx3080
+      runtimeClassName: nvidia
+      containers:
+        - name: nvidia-device-plugin-ctr
+          image: nvcr.io/nvidia/k8s-device-plugin:v0.17.0
+          env:
+            - {name: FAIL_ON_INIT_ERROR, value: "false"}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - {name: device-plugin, mountPath: /var/lib/kubelet/device-plugins}
+      volumes:
+        - name: device-plugin
+          hostPath:
+            path: /var/lib/kubelet/device-plugins

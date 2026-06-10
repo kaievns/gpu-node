@@ -1,0 +1,10 @@
+[Unit]
+Description=GPU node idle check (every 5 min)
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=5min
+Unit=gpu-idle-check.service
+
+[Install]
+WantedBy=timers.target

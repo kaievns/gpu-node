@@ -1,0 +1,9 @@
+gaming-agent ALL=(root) NOPASSWD: \
+    /usr/bin/systemctl start gamescope-headless.service, \
+    /usr/bin/systemctl stop gamescope-headless.service, \
+    /usr/bin/systemctl start sunshine.service, \
+    /usr/bin/systemctl stop sunshine.service, \
+    /usr/bin/systemctl suspend, \
+    /usr/bin/systemctl hibernate, \
+    /usr/local/sbin/gpu-profile compute, \
+    /usr/local/sbin/gpu-profile gaming

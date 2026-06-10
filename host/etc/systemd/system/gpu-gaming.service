@@ -1,0 +1,9 @@
+[Unit]
+Description=Force gaming GPU profile (DEFAULT compute mode) for streaming
+After=gpu-profile.service
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/gpu-profile gaming
+[Install]
+WantedBy=multi-user.target

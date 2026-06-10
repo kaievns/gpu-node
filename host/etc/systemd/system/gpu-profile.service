@@ -1,0 +1,13 @@
+[Unit]
+Description=Apply GPU profile (boot default: compute)
+After=nvidia-persistenced.service
+Wants=nvidia-persistenced.service
+Before=k3s-agent.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/gpu-profile compute
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

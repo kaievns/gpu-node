@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gpu-node-controller
+  namespace: gpu-node-system
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate   # never run two controllers (would fight over the taint)
+  selector:
+    matchLabels:
+      app: gpu-node-controller
+  template:
+    metadata:
+      labels:
+        app: gpu-node-controller
+    spec:
+      serviceAccountName: gpu-node-controller
+      # hostNetwork: so the WOL magic packet to 255.255.255.255:9 actually
+      # broadcasts on the LAN. With pod networking + flannel/vxlan it'd just
+      # die inside the overlay.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      affinity:
+        nodeAffinity:
+          # NEVER run on gpu-node itself — controller would vanish along with
+          # the box when it sleeps.
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values: ["gpu-node"]
+      restartPolicy: Always
+      containers:
+        - name: controller
+          image: alpine:3.20
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          # Bootstrap tools + run controller. apk on first start ~5s; the
+          # container then loops forever. Image is plain alpine for trust.
+          args:
+            - |
+              set -e
+              apk add --no-cache --quiet bash curl jq python3 ca-certificates
+              # kubectl: pinned to the cluster's minor version. This pin WILL
+              # rot — bump it when k3s upgrades (skew policy tolerates ±1
+              # minor). No checksum verification: it's a fresh TLS fetch from
+              # dl.k8s.io on every pod start, and a pinned sha256 would be a
+              # second thing to rot in lockstep. Fine for this homelab's
+              # threat model; add the .sha256 check if yours differs.
+              if ! [ -x /usr/local/bin/kubectl ]; then
+                curl -fsSL -o /usr/local/bin/kubectl \
+                  "https://dl.k8s.io/release/v1.33.7/bin/linux/amd64/kubectl"
+                chmod +x /usr/local/bin/kubectl
+              fi
+              exec bash /scripts/controller.sh
+          env:
+            - name: AGENT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: gpu-node-controller-secret
+                  key: agent-token
+            - name: NODE
+              value: "gpu-node"
+            - name: NODE_MAC
+              value: "58:11:22:b0:a6:af"
+            - name: AGENT_URL
+              value: "http://172.16.1.220:8080"
+            - name: COOLDOWN_SECONDS
+              value: "300"      # 5 min
+            - name: POLL_INTERVAL
+              value: "15"
+            - name: WOL_READY_TIMEOUT
+              value: "120"
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+              readOnly: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              # CAP_NET_BROADCAST for WOL. hostNetwork is the bigger lever
+              # but cap doesn't hurt.
+              add: ["NET_BROADCAST"]
+              drop: ["ALL"]
+      volumes:
+        - name: script
+          configMap:
+            name: gpu-node-controller-script
+            defaultMode: 0755

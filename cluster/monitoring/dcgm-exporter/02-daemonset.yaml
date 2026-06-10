@@ -1,0 +1,109 @@
+# DCGM-exporter — NVIDIA's official GPU metrics exporter (uses NVML, not CUDA,
+# so it coexists with EXCLUSIVE_PROCESS compute workloads without grabbing a
+# context).
+#
+# IMPORTANT: this DaemonSet does NOT request `nvidia.com/gpu` resource — that
+# would compete with active GPU pods for the device-plugin slot (there's only
+# 1 GPU). Instead it uses the legacy `NVIDIA_VISIBLE_DEVICES=all` env pattern
+# plus `runtimeClassName: nvidia`, which makes nvidia-container-runtime inject
+# /dev/nvidia* + driver libs into the container without claiming the resource.
+# NVML access works regardless of CUDA compute_mode (DEFAULT or
+# EXCLUSIVE_PROCESS).
+#
+# Tolerates all THREE gpu-node taints (gpu, dynamic-node, mode=gaming) so the
+# exporter keeps emitting metrics in both gaming and compute modes — unlike
+# regular compute workloads which must NOT tolerate mode=gaming (that's the
+# mutual-exclusion lever).
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: dcgm-exporter
+  namespace: gpu-node-system
+  labels:
+    app.kubernetes.io/name: dcgm-exporter
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dcgm-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dcgm-exporter
+    spec:
+      serviceAccountName: dcgm-exporter
+      runtimeClassName: nvidia
+      nodeSelector:
+        gpu.model: rtx3080
+      tolerations:
+        - {key: gpu,          operator: Equal, value: "true",  effect: NoSchedule}
+        - {key: dynamic-node, operator: Equal, value: "true",  effect: NoSchedule}
+        - {key: mode,         operator: Equal, value: "gaming", effect: NoSchedule}
+      priorityClassName: system-node-critical
+      containers:
+        - name: dcgm-exporter
+          # 4.5.2-4.8.1-ubuntu22.04 — exporter 4.5.2, DCGM 4.8.1.
+          # Confirmed published via NGC tag list 2026-05-22. Supports
+          # nvidia-driver 555+ — we're on 595.71.05 (nvidia-open).
+          image: nvcr.io/nvidia/k8s/dcgm-exporter:4.5.2-4.8.1-ubuntu22.04
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DCGM_EXPORTER_LISTEN
+              value: ":9400"
+            - name: DCGM_EXPORTER_KUBERNETES
+              value: "true"
+            # Custom counter CSV (04-custom-counters.yaml): the default set
+            # plus clock-event-reason bitmask, P-state, and violation
+            # counters — the telemetry that actually diagnoses the Xid 79 /
+            # GDDR6X heat-soak failure mode on this card.
+            - name: DCGM_EXPORTER_COLLECTORS
+              value: "/etc/dcgm-exporter/custom/counters.csv"
+            # The two env vars below are how nvidia-container-runtime knows
+            # to inject the GPU without a device-plugin allocation.
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "all"
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: "compute,utility"
+            # Improve pod->GPU correlation labels by mapping container PIDs
+            # back to k8s pods via the kubelet pod-resources socket.
+            - name: NVIDIA_MIG_MONITOR_DEVICES
+              value: "all"
+          ports:
+            - name: metrics
+              containerPort: 9400
+              protocol: TCP
+          # SYS_ADMIN is what DCGM needs to read certain hardware counters;
+          # alternative is privileged: true (we don't want that).
+          securityContext:
+            runAsNonRoot: false
+            capabilities:
+              add: ["SYS_ADMIN"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi   # DCGM 4.x with the full default metric set takes ~300-500 MiB; 256 MiB OOMs
+          livenessProbe:
+            httpGet: {path: /health, port: 9400}
+            initialDelaySeconds: 45
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: {path: /health, port: 9400}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: pod-resources
+              mountPath: /var/lib/kubelet/pod-resources
+              readOnly: true
+            - name: counters
+              mountPath: /etc/dcgm-exporter/custom
+              readOnly: true
+      volumes:
+        - name: pod-resources
+          hostPath:
+            path: /var/lib/kubelet/pod-resources
+            type: Directory
+        - name: counters
+          configMap:
+            name: dcgm-exporter-counters

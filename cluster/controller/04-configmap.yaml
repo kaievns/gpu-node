@@ -1,0 +1,249 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gpu-node-controller-script
+  namespace: gpu-node-system
+data:
+  controller.sh: |
+    #!/bin/bash
+    # gpu-node-controller: enforces mutually-exclusive gaming/compute mode on
+    # the gpu-node host by managing a dynamic taint + calling its gaming-agent.
+    #
+    # State machine (full picture in ../../docs/architecture.md; controller
+    # specifics in README.md alongside this file):
+    #
+    # - In GAMING mode: node has `mode=gaming:NoSchedule` taint, compute pods
+    #   can't land. We watch cluster-wide for Pending pods that want gpu-node
+    #   (request nvidia.com/gpu + tolerate the static gpu+dynamic-node taints).
+    #   When seen → WOL if needed → POST /mode/compute → remove gaming taint
+    #   → pod schedules.
+    # - In COMPUTE mode: gaming taint removed, compute pods schedule freely.
+    #   We track when we last saw a compute pod on the node. After
+    #   COOLDOWN_SECONDS (5 min) of no compute pods → POST /mode/gaming →
+    #   add gaming taint back → idle-check timer on the host eventually sleeps.
+    set -uo pipefail
+    
+    NODE=${NODE:-gpu-node}
+    NODE_MAC=${NODE_MAC:-58:11:22:b0:a6:af}
+    AGENT_URL=${AGENT_URL:-http://172.16.1.220:8080}
+    COOLDOWN_SECONDS=${COOLDOWN_SECONDS:-300}
+    POLL_INTERVAL=${POLL_INTERVAL:-15}
+    WOL_READY_TIMEOUT=${WOL_READY_TIMEOUT:-120}
+    
+    log() { echo "[$(date '+%F %T')] $*"; }
+    
+    agent_call() {
+      local method=$1 path=$2
+      curl -fsS -m 90 -X "$method" \
+        -H "Authorization: Bearer $AGENT_TOKEN" \
+        "$AGENT_URL$path"
+    }
+    
+    is_node_ready() {
+      kubectl get node "$NODE" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null
+    }
+    
+    # True if a Moonlight client is mid-stream (Sunshine logged CLIENT CONNECTED
+    # more recently than CLIENT DISCONNECTED). Defers compute flips so we don't
+    # kill a running game.
+    is_streaming() {
+      local s
+      s=$(agent_call GET /status 2>/dev/null) || return 1
+      [ "$(echo "$s" | jq -r .streaming_active)" = "true" ]
+    }
+    
+    get_node_mode() {
+      # Echoes gaming/compute, or "unknown" when the API call itself fails —
+      # callers must hold state on unknown rather than assume compute.
+      local json v
+      json=$(kubectl get node "$NODE" -o json 2>/dev/null) || { echo "unknown"; return; }
+      v=$(echo "$json" | jq -r '.spec.taints[]? | select(.key=="mode") | .value')
+      [ "$v" = "gaming" ] && echo "gaming" || echo "compute"
+    }
+    
+    # Count Pending pods anywhere that (a) request nvidia.com/gpu and
+    # (b) tolerate BOTH the static taints (gpu + dynamic-node). Those are the
+    # pods that would land on gpu-node if the gaming taint were removed.
+    count_pending_compute() {
+      # Echoes -1 when the pod listing fails: "API down" must not read as
+      # "zero pods" (that misread would advance the cooldown clock and flip
+      # modes underneath live workloads during an API outage).
+      local json
+      json=$(kubectl get pods --all-namespaces -o json \
+               --field-selector=status.phase=Pending 2>/dev/null) || { echo -1; return; }
+      echo "$json" \
+        | jq '[
+            .items[]
+            | select((
+                [.spec.containers[]?.resources.requests["nvidia.com/gpu"] // "0",
+                 .spec.containers[]?.resources.limits["nvidia.com/gpu"]   // "0"]
+                | map(tonumber) | add) > 0)
+            | select(([.spec.tolerations[]?.key]
+                      | (index("gpu") != null) and (index("dynamic-node") != null)))
+          ] | length' 2>/dev/null || echo -1
+    }
+    
+    # Compute pods (Running or Pending) currently scheduled on gpu-node.
+    count_compute_on_node() {
+      # Same -1 sentinel as count_pending_compute.
+      local json
+      json=$(kubectl get pods --all-namespaces -o json \
+               --field-selector=spec.nodeName="$NODE" 2>/dev/null) || { echo -1; return; }
+      echo "$json" \
+        | jq '[
+            .items[]
+            | select(.metadata.namespace != "kube-system")
+            | select((
+                [.spec.containers[]?.resources.requests["nvidia.com/gpu"] // "0",
+                 .spec.containers[]?.resources.limits["nvidia.com/gpu"]   // "0"]
+                | map(tonumber) | add) > 0)
+            | select(.status.phase == "Running" or .status.phase == "Pending")
+          ] | length' 2>/dev/null || echo -1
+    }
+    
+    wol_node() {
+      log "WOL: sending magic packet to $NODE_MAC via broadcast :9"
+      # Pure-Python WOL — alpine wakeonlan/wol packages aren't in main repo, and
+      # the magic packet is dead simple: 6 × 0xff + 16 × target MAC, UDP
+      # broadcast to :9. hostNetwork=true means this hits the LAN directly.
+      python3 -c "
+    import socket, sys
+    mac = sys.argv[1].replace(':', '').replace('-', '').lower()
+    if len(mac) != 12: raise SystemExit(f'bad MAC: {sys.argv[1]!r}')
+    packet = bytes.fromhex('ff' * 6 + mac * 16)
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    s.sendto(packet, ('255.255.255.255', 9))
+    " "$NODE_MAC" 2>&1 || log "WOL send failed (will still check node Ready below)"
+    }
+    
+    wait_for_ready() {
+      local deadline=$(($(date +%s) + WOL_READY_TIMEOUT))
+      while [ "$(date +%s)" -lt "$deadline" ]; do
+        [ "$(is_node_ready)" = "True" ] && return 0
+        sleep 2
+      done
+      return 1
+    }
+    
+    flip_to_compute() {
+      log "flipping to compute"
+      if [ "$(is_node_ready)" != "True" ]; then
+        log "node is NotReady; sending WOL and waiting up to ${WOL_READY_TIMEOUT}s"
+        wol_node
+        wait_for_ready || { log "WOL: node did not come Ready in time"; return 1; }
+      fi
+      if ! agent_call POST /mode/compute >/dev/null; then
+        log "agent /mode/compute FAILED — staying in gaming mode (won't remove taint)"
+        return 1
+      fi
+      kubectl taint nodes "$NODE" mode- 2>/dev/null || true
+      LAST_COMPUTE_SEEN=$(date +%s)
+      log "compute mode active; mode=gaming taint removed; pending pods will now schedule"
+    }
+    
+    flip_to_gaming() {
+      log "flipping to gaming"
+      # Apply taint BEFORE calling agent: prevents new compute pods landing
+      # during the small window while the agent is bringing the gaming stack up.
+      if ! kubectl taint nodes "$NODE" mode=gaming:NoSchedule --overwrite >/dev/null; then
+        log "taint apply FAILED — aborting gaming flip (compute pods must stay blocked first)"
+        return 1
+      fi
+      if ! agent_call POST /mode/gaming >/dev/null; then
+        log "agent /mode/gaming FAILED — taint applied but gaming stack may be down. INVESTIGATE."
+        return 1
+      fi
+      log "gaming mode active; taint applied"
+    }
+    
+    # Bootstrap: ensure node taint matches agent's actual mode.
+    bootstrap() {
+      log "bootstrap: querying agent at $AGENT_URL/status"
+      local s mode
+      s=$(agent_call GET /status 2>/dev/null) || {
+        log "agent unreachable on bootstrap; assuming gaming mode (applying taint defensively)"
+        kubectl taint nodes "$NODE" mode=gaming:NoSchedule --overwrite >/dev/null || true
+        return
+      }
+      mode=$(echo "$s" | jq -r .mode)
+      log "bootstrap: agent reports mode=$mode"
+      if [ "$mode" = "gaming" ]; then
+        kubectl taint nodes "$NODE" mode=gaming:NoSchedule --overwrite >/dev/null || true
+      else
+        kubectl taint nodes "$NODE" mode- 2>/dev/null || true
+      fi
+    }
+    
+    LAST_COMPUTE_SEEN=$(date +%s)
+    
+    log "gpu-node-controller starting; NODE=$NODE COOLDOWN=${COOLDOWN_SECONDS}s POLL=${POLL_INTERVAL}s"
+    bootstrap
+    
+    while true; do
+      current_mode=$(get_node_mode)
+      if [ "$current_mode" = "unknown" ]; then
+        log "kube API unreachable — holding current state this iteration"
+        sleep "$POLL_INTERVAL"; continue
+      fi
+    
+      if [ "$current_mode" = "gaming" ]; then
+        # Divergence detector: compute pods Running/Pending on this node while the
+        # taint says gaming. Happens after a host reboot reflips the GPU to gaming
+        # via the boot service chain while pods that landed in the pre-reboot
+        # compute window are still on the node.
+        #
+        # We deliberately do NOT call flip_to_compute here. The original
+        # rationale (PL change mid-workload → PMIC transient → Xid 79,
+        # 2026-05-24) was superseded: the real Xid 79 root cause was GDDR6X
+        # heat-soak (see docs/lessons/). The conservative behavior stays
+        # anyway — both modes run PL370 now so a flip buys nothing, and
+        # setting EXCLUSIVE_PROCESS under a live CUDA context plus tearing
+        # down the gaming stack mid-workload is pointless churn.
+        #
+        # The workload runs fine in DEFAULT mode (just shares the GPU with
+        # gamescope/sunshine). We just align the cluster-side taint with
+        # reality and let the workload finish; the next idle window triggers
+        # a clean flip_to_gaming.
+        on_node=$(count_compute_on_node)
+        if [ "${on_node:--1}" -lt 0 ]; then
+          log "pod listing failed — holding state this iteration"
+          sleep "$POLL_INTERVAL"; continue
+        fi
+        if [ "$on_node" -gt 0 ]; then
+          log "$on_node compute pod(s) on node despite mode=gaming taint — removing taint to align (taint only; not flipping under a live workload)"
+          kubectl taint nodes "$NODE" mode- 2>/dev/null || true
+          LAST_COMPUTE_SEEN=$(date +%s)
+        else
+          pending=$(count_pending_compute)
+          if [ "${pending:-0}" -gt 0 ]; then
+            if is_streaming; then
+              log "$pending pending compute pod(s) but Moonlight client is streaming — deferring flip"
+            else
+              log "$pending pending compute pod(s) detected"
+              if ! flip_to_compute; then
+                log "compute flip failed; will retry on next loop iteration if pods still pending"
+              fi
+            fi
+          fi
+        fi
+      else
+        # compute mode
+        on_node=$(count_compute_on_node)
+        if [ "${on_node:--1}" -lt 0 ]; then
+          log "pod listing failed — holding state this iteration (cooldown clock untouched)"
+          sleep "$POLL_INTERVAL"; continue
+        fi
+        if [ "$on_node" -gt 0 ]; then
+          LAST_COMPUTE_SEEN=$(date +%s)
+        fi
+        now=$(date +%s)
+        idle=$((now - LAST_COMPUTE_SEEN))
+        if [ "${on_node:-0}" -eq 0 ] && [ "$idle" -ge "$COOLDOWN_SECONDS" ]; then
+          log "no compute pods on $NODE for ${idle}s (cooldown ${COOLDOWN_SECONDS}s reached); flipping back"
+          flip_to_gaming || log "gaming flip failed; staying in compute mode, will retry"
+        fi
+      fi
+    
+      sleep "$POLL_INTERVAL"
+    done

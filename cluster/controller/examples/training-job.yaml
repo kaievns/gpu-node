@@ -1,0 +1,165 @@
+# Example GPU training Job for gpu-node.
+#
+# Apply this and the gpu-node-controller will:
+#   1. See it Pending (mode=gaming taint blocks it).
+#   2. Send a WOL packet if gpu-node is asleep + wait for Ready.
+#   3. Call /mode/compute on the host agent (stops gamescope-headless +
+#      sunshine, then runs gpu-profile compute: PL370, boost ceiling lifted,
+#      EXCLUSIVE_PROCESS as defense in depth).
+#   4. Remove the mode=gaming:NoSchedule taint.
+#   5. This pod schedules + runs.
+#   6. After this Job completes, the controller waits 5 min (COOLDOWN) for
+#      any follow-up GPU pods. If none, it flips back to gaming mode and
+#      re-applies the gaming taint. Box sleeps 15 min after that if idle.
+#
+# Three things make this work — if you copy this for your own workload, KEEP:
+#   - tolerations on `gpu` AND `dynamic-node`  (matches the static taints)
+#   - NO toleration for `mode=gaming`           (the controller's lever)
+#   - resources.limits."nvidia.com/gpu": 1      (binds a real device)
+#   - runtimeClassName: nvidia                  (nvidia-container-runtime)
+#   - nodeSelector gpu.model=rtx3080            (paranoia; ensures gpu-node)
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pytorch-training-demo
+  namespace: default
+spec:
+  # backoffLimit=0: if it fails, don't retry — surface the failure for me.
+  # Bump if you want automatic retries on transient errors.
+  backoffLimit: 0
+  # activeDeadlineSeconds: kill the Job if it runs longer than this.
+  # 1800s = 30 min here; raise for real training.
+  activeDeadlineSeconds: 1800
+  # ttlSecondsAfterFinished: auto-delete the Job (and its pod) 1h after done,
+  # so it doesn't clutter the cluster. Set to 0 to delete immediately.
+  ttlSecondsAfterFinished: 3600
+
+  template:
+    metadata:
+      labels:
+        app: pytorch-training-demo
+    spec:
+      # ── REQUIRED for nvidia GPU pods (RuntimeClass defined in ───────────
+      # ── ../../device-plugin/nvidia-device-plugin.yaml) ──────────────────
+      runtimeClassName: nvidia
+
+      # ── REQUIRED to land on gpu-node (matches its static taints) ────────
+      tolerations:
+        - key: gpu
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+        - key: dynamic-node
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+      # IMPORTANT: do NOT add a toleration for `mode=gaming` — that's the
+      # mechanism the controller uses to enforce mutual exclusion. If you
+      # tolerate it, your pod co-schedules with active gaming and fights
+      # the gaming stack for the GPU: stream stutter, slow training, no
+      # winners.
+
+      # ── Optional but recommended: pin to gpu-node by label ──────────────
+      # Without this, k8s could theoretically schedule onto any node that
+      # tolerates the taints (currently only gpu-node, but future-proofing).
+      nodeSelector:
+        gpu.model: rtx3080
+
+      restartPolicy: Never
+
+      containers:
+        - name: trainer
+          # NGC PyTorch image — current as of 2026-05. Use whatever you need.
+          # Alternatives:
+          #   pytorch/pytorch:2.5.0-cuda12.4-cudnn9-runtime  (smaller, official)
+          #   huggingface/transformers-pytorch-gpu:latest    (HF tooling)
+          image: nvcr.io/nvidia/pytorch:24.10-py3
+
+          command: ["python", "-u", "-c"]
+          args:
+            - |
+              import time, torch
+              import torch.nn as nn
+              import torch.optim as optim
+              from torch.amp import autocast, GradScaler
+
+              print(f"PyTorch {torch.__version__}  CUDA {torch.version.cuda}")
+              print(f"GPU: {torch.cuda.get_device_name(0)}")
+              props = torch.cuda.get_device_properties(0)
+              print(f"GPU memory: {props.total_memory / 1e9:.1f} GB")
+              print(f"SMs: {props.multi_processor_count}\n")
+
+              device = torch.device("cuda")
+              # Modest ResNet-style CNN — uses ~1.5 GB VRAM, trains in a few minutes
+              model = nn.Sequential(
+                  nn.Conv2d(3, 128, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+                  nn.Conv2d(128, 256, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+                  nn.Conv2d(256, 512, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+                  nn.Flatten(),
+                  nn.Linear(512 * 8 * 8, 1024), nn.ReLU(),
+                  nn.Linear(1024, 10),
+              ).to(device)
+
+              opt = optim.AdamW(model.parameters(), lr=1e-3)
+              scaler = GradScaler("cuda")
+              loss_fn = nn.CrossEntropyLoss()
+
+              # Synthetic data — no dataset download needed for the demo.
+              # Replace this loop with your real DataLoader.
+              BATCH = 256
+              BATCHES = 200
+              EPOCHS = 5
+
+              for epoch in range(EPOCHS):
+                  t0 = time.time()
+                  for i in range(BATCHES):
+                      x = torch.randn(BATCH, 3, 64, 64, device=device)
+                      y = torch.randint(0, 10, (BATCH,), device=device)
+                      opt.zero_grad(set_to_none=True)
+                      with autocast("cuda", dtype=torch.float16):
+                          out = model(x)
+                          loss = loss_fn(out, y)
+                      scaler.scale(loss).backward()
+                      scaler.step(opt)
+                      scaler.update()
+                      if i % 50 == 0:
+                          mem = torch.cuda.memory_allocated() / 1e9
+                          print(f"[epoch {epoch+1}/{EPOCHS}] batch {i+1:>3}/{BATCHES}  "
+                                f"loss={loss.item():.3f}  vram={mem:.2f} GB",
+                                flush=True)
+                  dt = time.time() - t0
+                  imgs_per_sec = BATCH * BATCHES / dt
+                  print(f"epoch {epoch+1} done in {dt:.1f}s ({imgs_per_sec:.0f} img/s)\n", flush=True)
+
+              print("Training complete.")
+              print(f"Params: {sum(p.numel() for p in model.parameters()):,}")
+              # Real training would save the checkpoint to a mounted PVC here:
+              #   torch.save(model.state_dict(), "/mnt/checkpoints/final.pt")
+
+          # ── Hard GPU claim (REQUIRED) ───────────────────────────────────
+          resources:
+            limits:
+              nvidia.com/gpu: 1
+              cpu: 4
+              memory: 8Gi
+            requests:
+              nvidia.com/gpu: 1
+              cpu: 2
+              memory: 4Gi
+
+          # ── Persistent storage example (commented out — wire in for real training) ──
+          # volumeMounts:
+          #   - name: checkpoints
+          #     mountPath: /mnt/checkpoints
+          #   - name: dataset
+          #     mountPath: /mnt/dataset
+          #     readOnly: true
+
+      # volumes:
+      #   - name: checkpoints
+      #     persistentVolumeClaim:
+      #       claimName: training-checkpoints
+      #   - name: dataset
+      #     persistentVolumeClaim:
+      #       claimName: cifar10-pvc
