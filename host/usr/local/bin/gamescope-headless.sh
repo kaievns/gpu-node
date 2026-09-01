@@ -13,4 +13,5 @@ export __GL_SHADER_DISK_CACHE_SIZE=12000000000
 export __GL_SHADER_DISK_CACHE_SKIP_CLEANUP=1
 export VKD3D_SHADER_CACHE_PATH=/home/kai/.cache/vkd3d-proton
 export DXVK_STATE_CACHE_PATH=/home/kai/.cache/dxvk
-exec gamescope --backend drm --prefer-output HDMI-A-2 -W 1280 -H 800 -r 90 --hdr-enabled -e -- steam -gamepadui > /tmp/gamescope-headless.log 2>&1
+[ -r /etc/gamescope-headless/resolution ] && . /etc/gamescope-headless/resolution
+exec gamescope --backend drm --prefer-output HDMI-A-2 -W "${GS_W:-1280}" -H "${GS_H:-800}" -r "${GS_R:-90}" --hdr-enabled -e -- steam -gamepadui > /tmp/gamescope-headless.log 2>&1

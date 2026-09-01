@@ -6,6 +6,8 @@ svc gamescope-headless.service active
 svc sunshine.service             active
 svc sunshine-disconnect-watchdog.service active
 
+[ -x /usr/local/sbin/stream-res ] && ok "stream-res installed" || fail "stream-res missing"
+
 # Sunshine listening on its standard ports
 for p in 47984 47989 47990 48010; do
   ss -tlnp 2>/dev/null | grep -q ":$p " && ok "Sunshine listening on $p" || fail "port $p not listening"

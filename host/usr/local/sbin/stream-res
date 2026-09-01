@@ -1,0 +1,86 @@
+#!/bin/bash
+# Switch the headless stream output mode. Restarts gamescope + Sunshine
+# (~20 s, Steam session included). See docs/streaming.md §6.
+set -euo pipefail
+
+CONF_DIR=/etc/gamescope-headless
+CONF="$CONF_DIR/resolution"
+LOG=/tmp/gamescope-headless.log
+
+usage() {
+  cat <<EOF
+usage: stream-res <preset|WxH[@R]> [--force] | status
+presets: deck  = 1280x800@90 (default, no override file)
+         1080p = 1920x1080@60
+         1440p = 2560x1440@60
+EOF
+  exit 1
+}
+
+mode_line() { grep -o "selecting mode .*" "$LOG" 2>/dev/null | tail -1; }
+
+if [ "${1:-}" = status ]; then
+  if [ -r "$CONF" ]; then echo "override: $(tr '\n' ' ' <"$CONF")"; else echo "override: none (deck 1280x800@90)"; fi
+  echo "gamescope: $(systemctl is-active gamescope-headless || true) [$(mode_line || echo n/a)]"
+  echo "sunshine:  $(systemctl is-active sunshine || true)"
+  exit 0
+fi
+
+case "${1:-}" in
+  deck)  W=1280 H=800  R=90 ;;
+  1080p) W=1920 H=1080 R=60 ;;
+  1440p) W=2560 H=1440 R=60 ;;
+  *x*@*) W=${1%%x*} H=${1#*x}; H=${H%@*}; R=${1##*@} ;;
+  *x*)   W=${1%%x*} H=${1#*x} R=60 ;;
+  *) usage ;;
+esac
+case "$W$H$R" in ''|*[!0-9]*) usage ;; esac
+
+grep -qx "${W}x${H}" /sys/class/drm/card*-HDMI-A-2/modes || {
+  echo "error: ${W}x${H} not offered by the injected EDID (see */modes)"; exit 1; }
+
+if [ "${2:-}" != --force ]; then
+  last=$(sudo journalctl -u sunshine -b --no-pager | grep -E "CLIENT (CONNECTED|DISCONNECTED)" | tail -1)
+  case "$last" in *"CLIENT CONNECTED"*)
+    echo "refusing: a client looks connected (--force to override)"
+    echo "  $last"
+    exit 1 ;;
+  esac
+fi
+
+write_conf() {
+  if [ "$1" = 1280 ] && [ "$2" = 800 ] && [ "$3" = 90 ]; then
+    sudo rm -f "$CONF"
+  else
+    sudo mkdir -p "$CONF_DIR"
+    printf 'GS_W=%s\nGS_H=%s\nGS_R=%s\n' "$1" "$2" "$3" | sudo tee "$CONF" >/dev/null
+  fi
+}
+
+restart_stack() {
+  sudo systemctl stop sunshine
+  sudo systemctl stop gamescope-headless 2>/dev/null || true
+  sudo systemctl reset-failed gamescope-headless 2>/dev/null || true
+  sudo systemctl start gamescope-headless
+}
+
+verify() {
+  for _ in $(seq 1 20); do
+    sleep 1
+    mode_line | grep -q "selecting mode $1x$2@" && return 0
+  done
+  return 1
+}
+
+write_conf "$W" "$H" "$R"
+restart_stack
+if ! verify "$W" "$H"; then
+  echo "mode ${W}x${H} did not come up ($(mode_line || echo no mode)) — reverting to deck"
+  write_conf 1280 800 90
+  restart_stack
+  verify 1280 800 || { echo "REVERT FAILED — inspect gamescope-headless"; exit 2; }
+  sudo systemctl start sunshine
+  exit 1
+fi
+sudo systemctl start sunshine
+echo "ok: $(mode_line); sunshine $(systemctl is-active sunshine)"
