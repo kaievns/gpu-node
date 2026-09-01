@@ -207,3 +207,29 @@ Remaining gotchas baked into that config, learned the hard way:
 - No credentials live in `sunshine.conf`; pairing state and web-UI creds
   are in `sunshine_state.json`, which is deliberately never synced into
   this repo.
+
+## 6. Multi-resolution clients (stream-res)
+
+The injected EDID advertises more than the Deck's native mode (1080p, 1440p,
+4K are all in the KMS mode list), but gamescope fixes its output mode at
+launch — so serving a different client resolution pixel-natively means
+restarting the stack in the other mode. `stream-res` (run over SSH) does
+that in the DRM-master-safe order from §3, with auto-revert to the Deck
+default if the requested mode doesn't come up:
+
+```
+stream-res status     # current override + live mode
+stream-res 1080p      # iPad: 1920x1080@60
+stream-res 1440p      # 2560x1440@60
+stream-res 2560x1600@60   # any WxH[@R] the EDID offers
+stream-res deck       # back to 1280x800@90 (removes the override)
+```
+
+Mechanics: the override lives in `/etc/gamescope-headless/resolution`
+(`GS_W/GS_H/GS_R`, sourced by `gamescope-headless.sh`; absent = Deck
+native). The switch restarts gamescope + Sunshine (~20 s, Steam session
+included) and refuses to run while a Moonlight client is connected unless
+`--force`. The override survives reboots — flip back to `deck` when done.
+Without a switch, a client requesting a non-matching resolution still
+works: Sunshine scales the current output into the requested size (softer,
+letterboxed across aspect ratios).

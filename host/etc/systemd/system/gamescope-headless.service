@@ -1,5 +1,5 @@
 [Unit]
-Description=Standalone headless gamescope (HDR, Deck EDID, 1280x800@90)
+Description=Standalone headless gamescope (HDR, Deck EDID, default 1280x800@90, stream-res overrides)
 After=systemd-user-sessions.service systemd-logind.service
 [Service]
 User=kai
