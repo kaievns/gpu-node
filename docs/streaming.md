@@ -229,7 +229,7 @@ Mechanics: the override lives in `/etc/gamescope-headless/resolution`
 (`GS_W/GS_H/GS_R`, sourced by `gamescope-headless.sh`; absent = Deck
 native). The switch restarts gamescope + Sunshine (~20 s, Steam session
 included) and refuses to run while a Moonlight client is connected unless
-`--force`. The override survives reboots — flip back to `deck` when done.
+`--force`. The override clears on every reboot (`tmpfiles.d`) — the box always boots Deck-native; within a boot it persists across service restarts until changed.
 Without a switch, a client requesting a non-matching resolution still
 works: Sunshine scales the current output into the requested size (softer,
 letterboxed across aspect ratios).

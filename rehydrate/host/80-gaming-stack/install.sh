@@ -19,6 +19,7 @@ install_file 0755 root:root usr/local/bin/gamescope-headless.sh /usr/local/bin/g
 # disconnect-teardown helper
 install_file 0755 root:root usr/local/sbin/kill-running-game.sh /usr/local/sbin/kill-running-game.sh
 install_file 0755 root:root usr/local/sbin/stream-res /usr/local/sbin/stream-res
+install_file 0644 root:root etc/tmpfiles.d/gamescope-headless.conf /etc/tmpfiles.d/gamescope-headless.conf
 
 # units + drop-ins
 install_file 0644 root:root etc/systemd/system/gamescope-headless.service       /etc/systemd/system/gamescope-headless.service
