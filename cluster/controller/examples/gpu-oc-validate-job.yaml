@@ -1,0 +1,76 @@
+# Clock-offset validation: per phase, bf16 matmul throughput, copy bandwidth,
+# and a bit-exactness check of the matmul against a reference computed at
+# stock clocks (silent corruption is how an unstable OC shows up before Xids).
+# Offsets are applied from the host during the idle gaps (see docs/architecture.md).
+# Prints "phaseN,elapsed_s,tflops,gbps,mismatches" every 30 s.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gpu-oc-validate
+  namespace: default
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 3600
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: gpu-oc-validate
+    spec:
+      runtimeClassName: nvidia
+      tolerations:
+        - {key: gpu, operator: Equal, value: "true", effect: NoSchedule}
+        - {key: dynamic-node, operator: Equal, value: "true", effect: NoSchedule}
+      nodeSelector:
+        gpu.model: rtx5080
+      restartPolicy: Never
+      containers:
+        - name: bench
+          image: nvcr.io/nvidia/pytorch:25.03-py3
+          env:
+            - {name: PHASES, value: "6"}
+            - {name: BURN_S, value: "240"}
+            - {name: IDLE_S, value: "60"}
+          command: ["python", "-u", "-c"]
+          args:
+            - |
+              import os, time, torch
+              phases, burn, idle = (int(os.environ[k]) for k in ("PHASES","BURN_S","IDLE_S"))
+              dev = torch.device("cuda")
+              print(f"GPU: {torch.cuda.get_device_name(0)}  torch {torch.__version__}", flush=True)
+              n = 8192; flop = 2 * n**3
+              a = torch.randn(n, n, device=dev, dtype=torch.bfloat16)
+              b = torch.randn(n, n, device=dev, dtype=torch.bfloat16)
+              big = torch.empty(2**30, device=dev, dtype=torch.bfloat16)   # 2 GiB
+              ref = a @ b; torch.cuda.synchronize()
+              def run(seconds, tag):
+                  t_end = time.time() + seconds; t0 = time.time(); iters = 0; mism = 0
+                  while time.time() < t_end:
+                      for _ in range(20): c = a @ b
+                      iters += 20
+                      if not torch.equal(c, ref): mism += 1
+                      torch.cuda.synchronize(); now = time.time()
+                      if now - t0 >= 30:
+                          tf = iters * flop / (now - t0) / 1e12
+                          torch.cuda.synchronize(); tb = time.time()
+                          for _ in range(8): y = big.clone()
+                          torch.cuda.synchronize(); gbps = 8 * 2 * big.numel() * 2 / (time.time() - tb) / 1e9
+                          print(f"{tag},{now - t0:.0f},{tf:.1f},{gbps:.0f},{mism}", flush=True)
+                          t0 = time.time(); iters = 0; mism = 0
+              run(60, "warmup")
+              for p in range(1, phases + 1):
+                  print(f"phase {p} burn", flush=True)
+                  run(burn, f"phase{p}")
+                  print(f"phase {p} idle", flush=True)
+                  time.sleep(idle)
+              print("DONE", flush=True)
+          resources:
+            limits:
+              nvidia.com/gpu: 1
+              cpu: 4
+              memory: 8Gi
+            requests:
+              nvidia.com/gpu: 1
+              cpu: 2
+              memory: 4Gi
