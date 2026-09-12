@@ -71,8 +71,8 @@ data:
       local json
       json=$(kubectl get pods --all-namespaces -o json \
                --field-selector=status.phase=Pending 2>/dev/null) || { echo -1; return; }
-      echo "$json" \
-        | jq '[
+      local n
+      n=$(echo "$json" | jq '[
             .items[]
             | select((
                 [.spec.containers[]?.resources.requests["nvidia.com/gpu"] // "0",
@@ -80,7 +80,8 @@ data:
                 | map(tonumber) | add) > 0)
             | select(([.spec.tolerations[]?.key]
                       | (index("gpu") != null) and (index("dynamic-node") != null)))
-          ] | length' 2>/dev/null || echo -1
+          ] | length' 2>/dev/null | head -n1)
+      case "$n" in ''|*[!0-9]*) echo -1;; *) echo "$n";; esac
     }
     
     # Compute pods (Running or Pending) currently scheduled on gpu-node.
@@ -89,8 +90,8 @@ data:
       local json
       json=$(kubectl get pods --all-namespaces -o json \
                --field-selector=spec.nodeName="$NODE" 2>/dev/null) || { echo -1; return; }
-      echo "$json" \
-        | jq '[
+      local n
+      n=$(echo "$json" | jq '[
             .items[]
             | select(.metadata.namespace != "kube-system")
             | select((
@@ -98,7 +99,8 @@ data:
                  .spec.containers[]?.resources.limits["nvidia.com/gpu"]   // "0"]
                 | map(tonumber) | add) > 0)
             | select(.status.phase == "Running" or .status.phase == "Pending")
-          ] | length' 2>/dev/null || echo -1
+          ] | length' 2>/dev/null | head -n1)
+      case "$n" in ''|*[!0-9]*) echo -1;; *) echo "$n";; esac
     }
     
     wol_node() {
