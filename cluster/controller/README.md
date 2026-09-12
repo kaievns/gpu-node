@@ -28,7 +28,7 @@ tolerate the two static taints (`gpu=true` + `dynamic-node=true`) but **must
 not** tolerate `mode=gaming` — that's how they're naturally blocked while the
 box is in gaming mode.
 
-On the host side, a flip runs `gpu-profile` (v3.0): both modes run PL370 with
+On the host side, a flip runs `gpu-profile` (v4.0): both modes run the card's max PL with
 the core boost ceiling lifted; **compute** additionally sets
 `EXCLUSIVE_PROCESS` as defense in depth against accidental co-tenant CUDA
 contexts (the taint is the primary gate), while **gaming** runs `DEFAULT`.

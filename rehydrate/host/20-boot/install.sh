@@ -18,7 +18,7 @@ install_file 0644 root:root usr/lib/firmware/edid/steamdeck.bin /usr/lib/firmwar
 # ╚══════════════════════════════════════════════════════════════════════╝
 
 # systemd-boot loader.conf + arch.conf (cmdline includes drm.edid_firmware,
-# nvidia_drm.modeset, video=HDMI-A-2:e).
+# nvidia_drm.modeset, video=HDMI-A-1:e).
 install_file 0644 root:root boot/loader/loader.conf       /boot/loader/loader.conf
 install_file 0644 root:root boot/loader/entries/arch.conf /boot/loader/entries/arch.conf
 

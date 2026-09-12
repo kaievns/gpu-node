@@ -33,7 +33,7 @@ spec:
       serviceAccountName: dcgm-exporter
       runtimeClassName: nvidia
       nodeSelector:
-        gpu.model: rtx3080
+        gpu.model: rtx5080
       tolerations:
         - {key: gpu,          operator: Equal, value: "true",  effect: NoSchedule}
         - {key: dynamic-node, operator: Equal, value: "true",  effect: NoSchedule}

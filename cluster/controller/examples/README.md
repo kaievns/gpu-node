@@ -23,7 +23,7 @@ spec:
     - {key: gpu, operator: Equal, value: "true", effect: NoSchedule}
     - {key: dynamic-node, operator: Equal, value: "true", effect: NoSchedule}
   nodeSelector:
-    gpu.model: rtx3080           # paranoia; future-proofs if cluster grows
+    gpu.model: rtx5080           # paranoia; future-proofs if cluster grows
   containers:
     - resources:
         limits:
@@ -111,7 +111,7 @@ This is what `../test-flip.sh` does at the end of its run.
 - **MIG / GPU sharing**: not configured. Use time-slicing in the device
   plugin config if you ever want multiple pods to share the GPU
   simultaneously (not currently desired given the mutual-exclusion design).
-- **Power / compute mode** (`gpu-profile` v3.0): both modes run PL370 with
+- **Power / compute mode** (`gpu-profile` v4.0): both modes run the card's max PL with
   the core boost ceiling lifted; compute additionally sets
   `EXCLUSIVE_PROCESS` as defense in depth against stray co-tenant CUDA
   contexts. Note CUDA workloads force P2 pstate, so memory clock sits at

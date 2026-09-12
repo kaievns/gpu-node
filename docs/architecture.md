@@ -1,7 +1,7 @@
 # Architecture — one GPU, two jobs, strict arbitration
 
-One box ("Gameland", k8s node `gpu-node`: RTX 3080 10GB in a FormD T1, custom
-water loop) serves two roles that must never overlap:
+One box ("Gameland", k8s node `gpu-node`: RTX 5080 16GB in a FormD T1, custom
+water loop on the CPU) serves two roles that must never overlap:
 
 1. **Compute** — k3s GPU worker in a 3-server HA cluster, running ML training
    jobs.
@@ -35,12 +35,12 @@ This isn't a "be polite, share the GPU" arrangement. Hard reasons:
   slips past it.
 
 Per-mode GPU settings ([`host/usr/local/sbin/gpu-profile`](../host/usr/local/sbin/gpu-profile),
-v3.0):
+v4.0):
 
 | | compute | gaming |
 |---|---|---|
-| Power limit | 370 W | 370 W |
-| Core clock | `-lgc 0,2160` (boost ceiling lift) | same |
+| Power limit | card max (360 W) | card max (360 W) |
+| Core clock | stock boost, no lock | same |
 | Compute mode | `EXCLUSIVE_PROCESS` | `DEFAULT` |
 | CPU governor | performance | performance |
 

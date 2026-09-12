@@ -36,7 +36,7 @@ case "${1:-}" in
 esac
 case "$W$H$R" in ''|*[!0-9]*) usage ;; esac
 
-grep -qx "${W}x${H}" /sys/class/drm/card*-HDMI-A-2/modes || {
+grep -qx "${W}x${H}" /sys/class/drm/card*-HDMI-A-1/modes || {
   echo "error: ${W}x${H} not offered by the injected EDID (see */modes)"; exit 1; }
 
 if [ "${2:-}" != --force ]; then

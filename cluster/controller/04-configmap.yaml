@@ -197,7 +197,7 @@ data:
         # rationale (PL change mid-workload → PMIC transient → Xid 79,
         # 2026-05-24) was superseded: the real Xid 79 root cause was GDDR6X
         # heat-soak (see docs/lessons/). The conservative behavior stays
-        # anyway — both modes run PL370 now so a flip buys nothing, and
+        # anyway — both modes run the card's max PL now so a flip buys nothing, and
         # setting EXCLUSIVE_PROCESS under a live CUDA context plus tearing
         # down the gaming stack mid-workload is pointless churn.
         #

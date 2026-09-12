@@ -66,11 +66,6 @@ Comment-level and intentional. After a sync these show up as diffs — do
   since v3.0 (both modes PL370; the modes differ in compute mode and which
   services run). The repo copy carries the corrected comments. The code
   itself is identical — only `gpu-profile` knows the actual numbers.
-- [usr/local/sbin/gpu-profile](usr/local/sbin/gpu-profile) — two comment
-  fixes: the gaming branch's "no clock lock" line (the code right below it
-  applies the same `-lgc 0,2160` lift as compute), and a private wiki-link in
-  the v2.9 changelog entry now points at
-  [docs/lessons/xid79-gddr6x-heat-soak.md](../docs/lessons/xid79-gddr6x-heat-soak.md).
 - [etc/pipewire/pipewire.conf.d/](etc/pipewire/pipewire.conf.d/) — both conf
   headers carried stale priority claims from earlier iterations (HeSuVi
   "200", BinauralBus "system default", Surround_HRTF "100"). The repo copies
@@ -81,7 +76,7 @@ Comment-level and intentional. After a sync these show up as diffs — do
 
 | Path | What |
 |---|---|
-| [boot/loader/](boot/loader/) | systemd-boot config. `entries/arch.conf` carries the load-bearing kernel cmdline: `drm.edid_firmware=HDMI-A-2:edid/steamdeck.bin video=HDMI-A-2:e`, `nvidia_drm.modeset=1 fbdev=1`, `resume=` (hibernate swap). |
+| [boot/loader/](boot/loader/) | systemd-boot config. `entries/arch.conf` carries the load-bearing kernel cmdline: `drm.edid_firmware=HDMI-A-1:edid/steamdeck.bin video=HDMI-A-1:e`, `nvidia_drm.modeset=1 fbdev=1`, `resume=` (hibernate swap). |
 | [etc/coolercontrol/](etc/coolercontrol/) | CoolerControl daemon config: rad fans (nct6798 fan1/fan2) on the "watercurve" driven by coolant temp (asusec `T_Sensor`); pump (AIO_PUMP) pinned 100%. |
 | [etc/gaming-agent/](etc/gaming-agent/) | `token.example` only — recipe for generating the bearer token and its k8s Secret twin. The real token is never tracked. |
 | [etc/logrotate.d/](etc/logrotate.d/) | Rotation for the 1 Hz GPU telemetry log. |
