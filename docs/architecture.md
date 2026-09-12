@@ -1,7 +1,7 @@
 # Architecture — one GPU, two jobs, strict arbitration
 
 One box ("Gameland", k8s node `gpu-node`: RTX 5080 16GB in a FormD T1, custom
-water loop on the CPU) serves two roles that must never overlap:
+water loop) serves two roles that must never overlap:
 
 1. **Compute** — k3s GPU worker in a 3-server HA cluster, running ML training
    jobs.

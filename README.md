@@ -80,9 +80,9 @@ is mid-stream, because yanking the GPU kills NVENC under the running game.
 |---|---|
 | Case | FormD T1 (SFF). Closed GPU compartment — the root cause of the Xid 79 saga below. |
 | CPU | AMD Ryzen 7 5700X3D, 32 GB RAM |
-| GPU | RTX 5080 16GB GDDR7 (Inno3D reference, air-cooled). Replaced the water-blocked RTX 3080 on 2026-09-12; the Xid 79 history below is the 3080's. |
+| GPU | RTX 5080 16GB GDDR7 (Inno3D reference PCB), water-blocked, PCM thermal pad. Replaced the RTX 3080 on 2026-09-12; the Xid 79 history below is the 3080's. |
 | Motherboard | ASUS ROG Strix B550-I |
-| Cooling | Custom loop (CPU; the GPU block left with the 3080), one radiator. Alphacool DC-LT pump pinned at 100% — never on a curve. Bottom Noctua intake added to the GPU compartment (2026-05-25). |
+| Cooling | Single shared CPU+GPU loop, one radiator. Alphacool DC-LT pump pinned at 100% — never on a curve. Bottom Noctua intake added to the GPU compartment (2026-05-25). |
 | Storage | 1 TB Crucial P5 Plus NVMe — ESP / 32G swap (hibernate) / 150G root / rest home |
 | NIC | Intel I225-V (`enp7s0`), WOL armed |
 | Display | None. A valid Steam Deck EDID is kernel-injected (`drm.edid_firmware=`), so no HDMI dummy plug is needed — and a dummy plug wouldn't work anyway; see [docs/streaming.md](docs/streaming.md). |
