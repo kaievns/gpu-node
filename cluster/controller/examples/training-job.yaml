@@ -4,7 +4,7 @@
 #   1. See it Pending (mode=gaming taint blocks it).
 #   2. Send a WOL packet if gpu-node is asleep + wait for Ready.
 #   3. Call /mode/compute on the host agent (stops gamescope-headless +
-#      sunshine, then runs gpu-profile compute: PL370, boost ceiling lifted,
+#      sunshine, then runs gpu-profile compute: PL at card max,
 #      EXCLUSIVE_PROCESS as defense in depth).
 #   4. Remove the mode=gaming:NoSchedule taint.
 #   5. This pod schedules + runs.
@@ -17,7 +17,7 @@
 #   - NO toleration for `mode=gaming`           (the controller's lever)
 #   - resources.limits."nvidia.com/gpu": 1      (binds a real device)
 #   - runtimeClassName: nvidia                  (nvidia-container-runtime)
-#   - nodeSelector gpu.model=rtx3080            (paranoia; ensures gpu-node)
+#   - nodeSelector gpu.model=rtx5080            (paranoia; ensures gpu-node)
 ---
 apiVersion: batch/v1
 kind: Job
@@ -64,7 +64,7 @@ spec:
       # Without this, k8s could theoretically schedule onto any node that
       # tolerates the taints (currently only gpu-node, but future-proofing).
       nodeSelector:
-        gpu.model: rtx3080
+        gpu.model: rtx5080
 
       restartPolicy: Never
 

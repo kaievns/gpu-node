@@ -66,7 +66,7 @@ rules:
     for: 2m
     summary: "GPU die >85°C for 2 min on gpu-node"
     description: |
-      RTX 3080 die temp (DCGM_FI_DEV_GPU_TEMP) above 85°C. Hardware
+      GPU die temp (DCGM_FI_DEV_GPU_TEMP) above 85°C. Hardware
       thermal-throttle starts ~83°C; sustained 85+ = throttling +
       lifetime degradation. With water cooling this only happens if
       the loop has failed — post-repad, sustained 350W compute holds

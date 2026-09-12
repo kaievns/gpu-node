@@ -12,7 +12,7 @@ work.
 ```mermaid
 flowchart LR
     subgraph kernel ["Kernel / KMS"]
-        EDID["steamdeck.bin EDID<br/>(drm.edid_firmware=)"] --> CONN["HDMI-A-2<br/>1280x800@90, HDR10"]
+        EDID["steamdeck.bin EDID<br/>(drm.edid_firmware=)"] --> CONN["HDMI-A-1<br/>1280x800@90, HDR10"]
     end
     subgraph session ["gamescope session (DRM master)"]
         CONN --> GS["gamescope --backend drm<br/>--hdr-enabled"]
@@ -90,7 +90,7 @@ narrower than the internet suggests:
   instead:
 
   ```
-  $ cat /sys/class/drm/card*-HDMI-A-2/modes
+  $ cat /sys/class/drm/card*-HDMI-A-1/modes
   1280x800
   ```
 
@@ -108,7 +108,7 @@ narrower than the internet suggests:
 
    ```
    nvidia_drm.modeset=1 nvidia_drm.fbdev=1
-   drm.edid_firmware=HDMI-A-2:edid/steamdeck.bin video=HDMI-A-2:e
+   drm.edid_firmware=HDMI-A-1:edid/steamdeck.bin video=HDMI-A-1:e
    ```
 
    The EDID lives under `/usr/lib/firmware`, so rebuild the initramfs
@@ -117,7 +117,7 @@ narrower than the internet suggests:
    [`host/usr/local/bin/gamescope-headless.sh`](../host/usr/local/bin/gamescope-headless.sh):
 
    ```
-   gamescope --backend drm --prefer-output HDMI-A-2 \
+   gamescope --backend drm --prefer-output HDMI-A-1 \
              -W 1280 -H 800 -r 90 --hdr-enabled -e -- steam -gamepadui
    ```
 
@@ -174,7 +174,7 @@ again:
 
 | Piece | Setting | Where |
 |---|---|---|
-| Display | HDMI-A-2, 1280×800@90, HDR10, kernel-injected Deck EDID | [`host/boot/loader/entries/arch.conf`](../host/boot/loader/entries/arch.conf) |
+| Display | HDMI-A-1, 1280×800@90, HDR10, kernel-injected Deck EDID | [`host/boot/loader/entries/arch.conf`](../host/boot/loader/entries/arch.conf) |
 | Compositor | gamescope DRM backend, `--hdr-enabled`, launches `steam -gamepadui` | [`host/usr/local/bin/gamescope-headless.sh`](../host/usr/local/bin/gamescope-headless.sh) |
 | Session unit | tty8 login session via `PAMName=login`, caps dropped (Steam bwrap) | [`host/etc/systemd/system/gamescope-headless.service`](../host/etc/systemd/system/gamescope-headless.service) + [drop-ins](../host/etc/systemd/system/gamescope-headless.service.d/) |
 | Capture/encode | Sunshine `capture = kms`, `encoder = nvenc`, HEVC Main10 HDR | [`host/home/kai/.config/sunshine/sunshine.conf`](../host/home/kai/.config/sunshine/sunshine.conf) |

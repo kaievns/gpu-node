@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# host/60-gpu-profile — installs gpu-profile v3.0 + persistent telemetry.
-# v3.0 (2026-06-08, post PTM7950 repad — full thermal headroom):
-#   compute: PL370 + -lgc 0,2160 + EXCLUSIVE_PROCESS (defense in depth) + perf governor
-#   gaming:  PL370 + -lgc 0,2160 + DEFAULT + perf governor
+# host/60-gpu-profile — installs gpu-profile v4.0 + persistent telemetry.
+# v4.0 (2026-09-12, RTX 5080): PL = card max, no clock lock, perf governor;
+#   compute = EXCLUSIVE_PROCESS, gaming = DEFAULT.
 # Also installs gpu-telemetry (1Hz nvidia-smi capture for Xid forensics).
 set -euo pipefail
 . "$(dirname "$0")/../../lib/common.sh"

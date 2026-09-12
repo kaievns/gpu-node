@@ -508,7 +508,7 @@ data:
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "description": "GPU board power draw. Both modes run -pl 370 (gpu-profile v3.0); sustained training typically sits 300-350W.",
+          "description": "GPU board power draw. Both modes run the card's max PL, 360 W on the RTX 5080 (gpu-profile v4.0); sustained training typically sits 300-350W.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -532,7 +532,7 @@ data:
                   },
                   {
                     "color": "red",
-                    "value": 370
+                    "value": 360
                   }
                 ]
               },
@@ -587,14 +587,14 @@ data:
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "description": "Framebuffer used, out of the RTX 3080's 10240 MiB (values are MiB \u2014 DCGM reports FB in MiB).",
+          "description": "Framebuffer used, out of the RTX 5080's 16384 MiB (values are MiB \u2014 DCGM reports FB in MiB).",
           "fieldConfig": {
             "defaults": {
               "color": {
                 "mode": "thresholds"
               },
               "mappings": [],
-              "max": 10240,
+              "max": 16384,
               "min": 0,
               "thresholds": {
                 "mode": "absolute",
@@ -920,7 +920,7 @@ data:
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "description": "Board power vs the 370W power limit (red line). gpu-profile v3.0 sets -pl 370 in BOTH modes \u2014 earlier PL300/PL320 \"transient protection\" values were chasing a heat-soak problem that turned out to be mechanical. max() across DCGM series because labels fragment when the GPU-holding pod changes.",
+          "description": "Board power vs the 360 W power limit (red line). gpu-profile v4.0 sets PL to the card max in BOTH modes \u2014 earlier PL300/PL320 \"transient protection\" values were chasing a heat-soak problem that turned out to be mechanical. max() across DCGM series because labels fragment when the GPU-holding pod changes.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -969,7 +969,7 @@ data:
                   },
                   {
                     "color": "red",
-                    "value": 370
+                    "value": 360
                   }
                 ]
               },
@@ -1267,7 +1267,7 @@ data:
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "description": "Framebuffer in use, MiB, fixed axis to 10240 (RTX 3080 10GB) so a full card is obvious. Used only \u2014 used+free+reserved always sums to 10 GB, so stacking them is wasted ink.",
+          "description": "Framebuffer in use, MiB, fixed axis to 16384 (RTX 5080 16GB) so a full card is obvious. Used only \u2014 used+free+reserved always sums to 10 GB, so stacking them is wasted ink.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1306,7 +1306,7 @@ data:
                 }
               },
               "mappings": [],
-              "max": 10240,
+              "max": 16384,
               "min": 0,
               "thresholds": {
                 "mode": "absolute",

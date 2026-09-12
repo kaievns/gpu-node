@@ -2,7 +2,7 @@
 # Node name forced to gpu-node (RFC-1123 ok; differs from static hostname Gameland by user preference).
 node-name: "gpu-node"
 node-label:
-  - "gpu.model=rtx3080"
+  - "gpu.model=rtx5080"
   - "node.role=gpu-worker"
   - "node.type=dynamic"
 node-taint:

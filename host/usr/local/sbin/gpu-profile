@@ -1,133 +1,27 @@
 #!/bin/bash
-# gpu-profile {compute|gaming}
-#
-# v3.0 (2026-06-08): post-repad / post-bake profile — full power, lifted ceiling.
-#   GPU PTM7950 repad (2026-06-08) brought die-to-coldplate delta from 25-45°C
-#   to 10-13°C. Combined with the bottom Noctua + working memory pads (since
-#   2026-05-25), the card now has huge thermal headroom: sustained 350W
-#   tensor-core compute holds at edge 60-62°C / hotspot 71-72°C indefinitely,
-#   fans not even at 100%. So:
-#     - PL back to 370W (was 320 in v2.8/2.9 for thermal protection — not needed)
-#     - -lgc 0,2160 boost ceiling lift back on (was off in v2.7+ as Xid-79 hedge)
-#     - EXCLUSIVE_PROCESS retained (defense in depth)
-#   Effectively v2.2 settings — full power, full lift, EXCLUSIVE_PROCESS — now
-#   that the underlying thermal contact issue is actually resolved.
-#
-# v2.9 (2026-05-27): EXCLUSIVE_PROCESS added back to compute branch.
-#   The v2.5 finding (EXCLUSIVE_PROCESS = Xid 79 trigger) was based on three
-#   short clean runs and got disproven by a 3h overnight failure. Real root
-#   cause is GDDR6X memory thermal failure under sustained compute (see
-#   docs/lessons/xid79-gddr6x-heat-soak.md). With that understood, EXCLUSIVE_PROCESS
-#   is back to being a legitimate safety knob: prevents accidental concurrent
-#   CUDA contexts from co-tenanting the GPU when in compute mode. Mutual
-#   exclusion at the taint level is the primary gate; this is defense in depth.
-#   Agent's current_mode() still uses gamescope-headless service state (set
-#   in v2.5), so this -c flag doesn't break mode detection.
-#
-# v2.8 (2026-05-25): PL320 added back to compute for efficiency.
-#   With Xid 79 trigger known + fixed (EXCLUSIVE_PROCESS removed in v2.5),
-#   the power limit is purely an efficiency knob — lower PL = less heat
-#   + lower steady-state power for long training runs, modest throughput
-#   trade-off. 320W is in the sweet-spot region (we're SW-power-capped at
-#   370W under sustained load; dropping to 320W cuts ~14% peak draw but
-#   only ~3-5% real throughput since boost clock still hits 1700+ MHz).
-#
-# v2.7 (2026-05-24): compute branch dialed back to full firmware defaults.
-#   With EXCLUSIVE_PROCESS removed (v2.5), three real foundm runs landed
-#   clean. Confirmed: EXCLUSIVE_PROCESS was the Xid 79 trigger. OC offsets
-#   restored selectively in v2.8 (PL only, no -lgc lift).
-#
-# v2.6 (2026-05-24): PL370 + -lgc 0,2160 added back to compute branch.
-#   With v2.5 (no EXCLUSIVE_PROCESS, no PL, no -lgc) we tested whether the
-#   profile overrides triggered Xid 79. Per user direction, matched
-#   compute's GPU settings exactly to gaming. Backed out in v2.7 since
-#   the OC offsets don't help under power cap and just add variables.
-#
-# v2.5 (2026-05-24): EXCLUSIVE_PROCESS removed from compute branch.
-#   v2.4 (factory defaults + EXCLUSIVE_PROCESS) still hit Xid 79. Gaming runs
-#   at compute_mode=DEFAULT under heavier sustained load and is rock solid.
-#   So EXCLUSIVE_PROCESS itself is the last remaining differentiator between
-#   the working gaming profile and the faulting compute profile. v2.5 removes
-#   it to isolate. After this change, compute and gaming differ ONLY in:
-#     - which services are running (compute = none; gaming = gamescope+sunshine)
-#     - PL/clock-lock settings on gaming (which compute lacks)
-#   The agent (agent.py) now detects mode via gamescope-headless service
-#   state rather than compute_mode flag, since both modes are now DEFAULT.
-#
-# v2.4 (2026-05-24): compute branch stripped to FACTORY DEFAULTS + EXCLUSIVE_PROCESS only.
-#   Reasoning: PL320 (v2.3) still hit Xid 79 during normal training at step 990/1000.
-#   Meanwhile the card games for hours at much heavier sustained load with zero
-#   faults. So the card is fine — something in the compute profile (or what
-#   compute workloads do at this profile) is the trigger. Cutting ALL overrides
-#   (-pl, -lgc) and leaving only EXCLUSIVE_PROCESS so we can isolate whether
-#   the trigger is a clock/PL setting vs the workload itself.
-#
-# v2.3 (2026-05-24): compute PL370 -> PL320 to chase intermittent Xid 79 events.
-#   See git/memory for full rationale. Hit Xid 79 again during normal training
-#   so power-transient hypothesis is weakened. Rolled back to defaults in v2.4.
-#
-# v2.2 (2026-05-23): PL370 + -lgc 0,2160 restored after v2.1 mis-attributed crashes to OC.
-# Prior version had off_core/off_mem that called nvidia-settings, which only
-# works under Xorg. After the Phase-6 headless gamescope rebuild Xorg was
-# removed; those calls became silent no-ops, leaving compute mode at stock
-# clocks + 300 W cap. Live dmon evidence showed pviol 16-32% under load —
-# clear power-limited throttle, not thermal (water flat at 39 C).
-#
-# Changes vs v1:
-#   - compute: PL 300 -> 370 W (the card is already validated to sustain 370 W
-#     under the water-cooled loop at <64 C; the 300 W cap was an "efficiency
-#     choice" that cost 10-15% sustained perf).
-#   - compute: -lgc 0,2160 lifts the GPU boost ceiling above the firmware
-#     default 2115 (the supported-clocks list goes up to 2160). Briefly
-#     blamed for crashes on long workloads (v2.1 reverted it), but a soak
-#     after PyTorch-side fixes proved the OC is stable. Restored in v2.2.
-#     Combined with PL370 this is where the perf win comes from.
-#   - both: -rgc + -rmc reset on entry so transitions don't carry over
-#     locks from the previous profile.
-#   - both: removed dead nvidia-settings calls (off_core/off_mem) and the
-#     Xorg-gated PowerMizerMode flip — no Xorg in current headless setup.
-#   - both: cpupower -> performance (compute benefits from low-latency CUDA
-#     dispatch just like gaming).
-#
-# Memory OC (e.g. +800 transfer rate offset) requires nvidia-settings which
-# requires Xorg. Not currently achievable headlessly on nvidia-open 595.
-# Stock memory at 9501 MHz (P0 max) is what we get.
+# gpu-profile {compute|gaming} — see docs/architecture.md.
+# v4.0 (2026-09-12, RTX 5080): PL = card max, no clock lock. Modes differ
+# only in CUDA compute mode.
 set -uo pipefail
 
 nvidia-smi -pm 1 >/dev/null 2>&1 || true
+PL_MAX=$(nvidia-smi --query-gpu=power.max_limit --format=csv,noheader,nounits | cut -d. -f1)
+
+apply() {
+  nvidia-smi -rgc >/dev/null 2>&1 || true
+  nvidia-smi -rmc >/dev/null 2>&1 || true
+  nvidia-smi -pl "$PL_MAX" >/dev/null
+  nvidia-smi -c "$1" >/dev/null
+  cpupower frequency-set -g performance >/dev/null 2>&1 \
+    || for g in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+         echo performance > "$g" 2>/dev/null || true
+       done
+}
 
 case "${1:-}" in
-  compute)
-    # k8s/ML: v3.0 PL370 + boost ceiling lift + EXCLUSIVE_PROCESS.
-    # Post-repad thermal headroom is huge (sustained 350W = edge 61°C, hotspot
-    # 72°C with fans not at max). No reason to leave PL320 anymore.
-    nvidia-smi -rgc                 >/dev/null 2>&1 || true
-    nvidia-smi -rmc                 >/dev/null 2>&1 || true
-    nvidia-smi -pl 370              >/dev/null
-    nvidia-smi -lgc 0,2160          >/dev/null 2>&1 || true
-    nvidia-smi -c EXCLUSIVE_PROCESS >/dev/null
-    cpupower frequency-set -g performance >/dev/null 2>&1 \
-      || for g in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-           echo performance > "$g" 2>/dev/null || true
-         done
-    ;;
-  gaming)
-    # 1440p / streaming: full power, boost ceiling lifted same as compute,
-    # DEFAULT compute mode so Sunshine NVENC can grab a context.
-    nvidia-smi -rgc                 >/dev/null 2>&1 || true
-    nvidia-smi -rmc                 >/dev/null 2>&1 || true
-    nvidia-smi -pl 370              >/dev/null
-    nvidia-smi -lgc 0,2160          >/dev/null 2>&1 || true
-    nvidia-smi -c DEFAULT           >/dev/null
-    cpupower frequency-set -g performance >/dev/null 2>&1 \
-      || for g in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-           echo performance > "$g" 2>/dev/null || true
-         done
-    ;;
-  *)
-    echo "usage: gpu-profile {compute|gaming}" >&2
-    exit 2
-    ;;
+  compute) apply EXCLUSIVE_PROCESS ;;
+  gaming)  apply DEFAULT ;;
+  *) echo "usage: gpu-profile {compute|gaming}" >&2; exit 2 ;;
 esac
 
 echo "applied ${1}: $(nvidia-smi --query-gpu=power.limit,compute_mode,clocks.max.sm --format=csv,noheader)"

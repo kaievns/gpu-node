@@ -28,7 +28,7 @@ data:
     DCGM_FI_DEV_MEM_CLOCK,               gauge,   Memory clock frequency (MHz)
     # Temperature
     DCGM_FI_DEV_GPU_TEMP,                gauge,   GPU die temperature (C)
-    DCGM_FI_DEV_MEMORY_TEMP,             gauge,   Memory junction temperature (C) - constant 0 on consumer Ampere, kept in case of a future card
+    DCGM_FI_DEV_MEMORY_TEMP,             gauge,   Memory junction temperature (C) - constant 0 on consumer Ampere; may report on GDDR7
     # Power
     DCGM_FI_DEV_POWER_USAGE,             gauge,   Power draw (W)
     DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION, counter, Total energy consumption since driver load (mJ)

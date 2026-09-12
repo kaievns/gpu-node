@@ -1,7 +1,7 @@
 # gpu-node
 
-One small-form-factor Arch Linux box ("Gameland", a FormD T1 with a
-water-cooled RTX 3080) with two mutually exclusive personalities: a k3s GPU
+One small-form-factor Arch Linux box ("Gameland", a FormD T1 with an
+RTX 5080) with two mutually exclusive personalities: a k3s GPU
 worker that runs ML training jobs, **or** a headless HDR game-streaming host
 serving a Steam Deck over Moonlight. Never both. A cluster-side controller
 arbitrates automatically: when GPU pods queue, it wakes the box via
@@ -80,9 +80,9 @@ is mid-stream, because yanking the GPU kills NVENC under the running game.
 |---|---|
 | Case | FormD T1 (SFF). Closed GPU compartment — the root cause of the Xid 79 saga below. |
 | CPU | AMD Ryzen 7 5700X3D, 32 GB RAM |
-| GPU | RTX 3080 10GB GDDR6X, Bykski water block, PTM7950 die pad (repadded 2026-06-08) |
+| GPU | RTX 5080 16GB GDDR7 (Inno3D reference, air-cooled). Replaced the water-blocked RTX 3080 on 2026-09-12; the Xid 79 history below is the 3080's. |
 | Motherboard | ASUS ROG Strix B550-I |
-| Cooling | Single shared CPU+GPU loop, one radiator. Alphacool DC-LT pump pinned at 100% — never on a curve. Bottom Noctua intake added to the GPU compartment (2026-05-25). |
+| Cooling | Custom loop (CPU; the GPU block left with the 3080), one radiator. Alphacool DC-LT pump pinned at 100% — never on a curve. Bottom Noctua intake added to the GPU compartment (2026-05-25). |
 | Storage | 1 TB Crucial P5 Plus NVMe — ESP / 32G swap (hibernate) / 150G root / rest home |
 | NIC | Intel I225-V (`enp7s0`), WOL armed |
 | Display | None. A valid Steam Deck EDID is kernel-injected (`drm.edid_firmware=`), so no HDMI dummy plug is needed — and a dummy plug wouldn't work anyway; see [docs/streaming.md](docs/streaming.md). |

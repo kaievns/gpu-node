@@ -17,7 +17,7 @@ change one half of that without the other.
 flowchart LR
     subgraph gpu-node host
         hw[hwmon sensors] --> ne[node-exporter]
-        gpu[RTX 3080 / NVML] --> dcgm[dcgm-exporter]
+        gpu[RTX 5080 / NVML] --> dcgm[dcgm-exporter]
     end
     ne --> prom[Prometheus]
     dcgm --> prom
@@ -58,7 +58,7 @@ Then cross-reference against `sensors` output on the host until each
 | **Coolant water** | `node_hwmon_temp_celsius{chip="platform_asus_ec_sensors",sensor="temp4"}` | asusec `T_Sensor` — the 10kΩ NTC probe driving CoolerControl's watercurve |
 | **CPU Tctl** | `node_hwmon_temp_celsius{chip="pci0000:00_0000:00:18_3",sensor="temp1"}` | k10temp `Tctl` — AMD-reported package temp |
 | **CPU Tccd1 (die)** | `node_hwmon_temp_celsius{chip="pci0000:00_0000:00:18_3",sensor="temp3"}` | k10temp die-junction |
-| **GPU die (hwmon)** | `node_hwmon_temp_celsius{chip="0000:00:08_1_0000:06:00_0",sensor="temp1"}` | chip name is the GPU's PCI hierarchy; prefer `DCGM_FI_DEV_GPU_TEMP` |
+| **GPU die** | `DCGM_FI_DEV_GPU_TEMP` | nvidia-open 610 exposes no hwmon node for the RTX 5080 — DCGM is the only source |
 | **Chipset** | `node_hwmon_temp_celsius{chip="platform_asus_ec_sensors",sensor="temp1"}` | asusec `Chipset` |
 | **Motherboard** | `node_hwmon_temp_celsius{chip="platform_asus_ec_sensors",sensor="temp3"}` | asusec `Motherboard` |
 | **NVMe** | `node_hwmon_temp_celsius{chip="nvme_nvme0",sensor="temp1"}` | Crucial P5 Plus `Composite` |
