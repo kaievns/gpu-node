@@ -1,0 +1,11 @@
+#!/usr/bin/python3
+"""gpu-offsets [CORE_MHZ MEM_MHZ] — get/set NVML VF clock offsets (root to set)."""
+import sys
+import pynvml as n
+
+n.nvmlInit()
+h = n.nvmlDeviceGetHandleByIndex(0)
+if len(sys.argv) == 3:
+    n.nvmlDeviceSetGpcClkVfOffset(h, int(sys.argv[1]))
+    n.nvmlDeviceSetMemClkVfOffset(h, int(sys.argv[2]))
+print(f"core={n.nvmlDeviceGetGpcClkVfOffset(h)} mem={n.nvmlDeviceGetMemClkVfOffset(h)}")

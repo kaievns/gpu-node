@@ -35,18 +35,49 @@ This isn't a "be polite, share the GPU" arrangement. Hard reasons:
   slips past it.
 
 Per-mode GPU settings ([`host/usr/local/sbin/gpu-profile`](../host/usr/local/sbin/gpu-profile),
-v4.0):
+v4.1):
 
 | | compute | gaming |
 |---|---|---|
 | Power limit | card max (360 W) | card max (360 W) |
-| Core clock | stock boost, no lock | same |
+| Core clock | stock boost + `+200 MHz` VF offset, no lock | same |
+| Memory clock | `+1500 MHz` VF offset | same |
 | Compute mode | `EXCLUSIVE_PROCESS` | `DEFAULT` |
 | CPU governor | performance | performance |
 
-(Both modes run full power since the thermal root cause of the Xid 79
-crashes was fixed mechanically — see
-[lessons/xid79-gddr6x-heat-soak.md](lessons/xid79-gddr6x-heat-soak.md).)
+Offsets are applied through NVML (`gpu-offsets`, `python-nvidia-ml-py`) —
+no Xorg needed on driver 610. Both modes run full power since the thermal
+root cause of the 3080-era Xid 79 crashes was fixed mechanically — see
+[lessons/xid79-gddr6x-heat-soak.md](lessons/xid79-gddr6x-heat-soak.md).
+
+### Tuning data — RTX 5080, water-blocked, 2026-09-12
+
+bf16 8192³ matmul (`cluster/controller/examples/gpu-bench-job.yaml`),
+10-min phases, coolant plateau ~42 °C:
+
+| PL | draw | die | die−water | SM clock | TFLOPS |
+|---|---|---|---|---|---|
+| 360 W | 338 W | 61 °C | 19.0 °C | 2815 MHz | 119.0 |
+| 320 W | 320 W | 59.5 °C | 17.6 °C | 2789 MHz | 117.7 |
+| 280 W | 280 W | 55 °C | 15.6 °C | 2667 MHz | 112.9 |
+| 250 W | 250 W | 51 °C | 12.8 °C | 2582 MHz | 109.1 |
+
+At the 360 W cap the card is VF-curve-limited (~338 W draw), so the
+efficiency knee sits near 280 W (−5 % throughput for −17 % power) if a
+long training run ever wants it.
+
+Offset validation (`gpu-oc-validate-job.yaml`: matmul bit-exact against a
+stock-clock reference + 2 GiB copy bandwidth, 4-min phases, then a 30-min
+soak at the shipped setting; all 0 mismatches, 0 Xids):
+
+| offset | clock | TFLOPS | copy GB/s |
+|---|---|---|---|
+| stock | 2815 / 14801 | 118.8 | 816 |
+| +150 core | 2970 | 125.0 | — |
+| +250 core | 3060 (at 360 W cap) | 128.7 | — |
+| +1000 mem | 15301 | — | 845 |
+| +2000 mem | 15801 | — | 874 |
+| **+200 / +1500 (shipped)** | 3007 / 15551 | 126.8 | 859 |
 
 ## How exclusion is enforced: taints
 

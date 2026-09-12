@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-# host/60-gpu-profile — installs gpu-profile v4.0 + persistent telemetry.
-# v4.0 (2026-09-12, RTX 5080): PL = card max, no clock lock, perf governor;
-#   compute = EXCLUSIVE_PROCESS, gaming = DEFAULT.
+# host/60-gpu-profile — installs gpu-profile v4.1 + persistent telemetry.
+# v4.1 (2026-09-12, RTX 5080): PL = card max, validated VF offsets via
+#   gpu-offsets (NVML), perf governor; compute = EXCLUSIVE_PROCESS, gaming = DEFAULT.
 # Also installs gpu-telemetry (1Hz nvidia-smi capture for Xid forensics).
 set -euo pipefail
 . "$(dirname "$0")/../../lib/common.sh"
 
 ensure_pkg logrotate  # needed for gpu-telemetry log rotation
+ensure_pkg python-nvidia-ml-py  # gpu-offsets
 
 install_file 0755 root:root usr/local/sbin/gpu-profile /usr/local/sbin/gpu-profile
+install_file 0755 root:root usr/local/sbin/gpu-offsets /usr/local/sbin/gpu-offsets
 install_file 0644 root:root etc/systemd/system/gpu-profile.service /etc/systemd/system/gpu-profile.service
 install_file 0644 root:root etc/systemd/system/gpu-gaming.service  /etc/systemd/system/gpu-gaming.service
 
