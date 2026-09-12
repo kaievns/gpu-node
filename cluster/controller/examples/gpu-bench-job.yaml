@@ -1,0 +1,71 @@
+# Tensor-core throughput benchmark with idle gaps (for power-limit sweeps
+# driven from the host between phases). Same scheduling shape as
+# training-job.yaml. Prints one "phase,p,elapsed_s,tflops" line per 30 s.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gpu-bench
+  namespace: default
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 5400
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: gpu-bench
+    spec:
+      runtimeClassName: nvidia
+      tolerations:
+        - {key: gpu, operator: Equal, value: "true", effect: NoSchedule}
+        - {key: dynamic-node, operator: Equal, value: "true", effect: NoSchedule}
+      nodeSelector:
+        gpu.model: rtx5080
+      restartPolicy: Never
+      containers:
+        - name: bench
+          image: nvcr.io/nvidia/pytorch:24.10-py3
+          env:
+            - {name: PHASES, value: "4"}
+            - {name: BURN_S, value: "480"}
+            - {name: IDLE_S, value: "180"}
+            - {name: WARMUP_S, value: "60"}
+          command: ["python", "-u", "-c"]
+          args:
+            - |
+              import os, time, torch
+              phases, burn, idle, warm = (int(os.environ[k]) for k in ("PHASES","BURN_S","IDLE_S","WARMUP_S"))
+              dev = torch.device("cuda")
+              print(f"GPU: {torch.cuda.get_device_name(0)}  torch {torch.__version__}", flush=True)
+              n = 8192
+              a = torch.randn(n, n, device=dev, dtype=torch.bfloat16)
+              b = torch.randn(n, n, device=dev, dtype=torch.bfloat16)
+              flop = 2 * n**3
+              def run(seconds, tag):
+                  t_end = time.time() + seconds; last = time.time(); iters = 0; t0 = last
+                  while time.time() < t_end:
+                      c = a @ b
+                      iters += 1
+                      if iters % 20 == 0:
+                          torch.cuda.synchronize(); now = time.time()
+                          if now - last >= 30:
+                              print(f"{tag},{now - t0:.0f},{iters*flop/(now - t0)/1e12:.1f}", flush=True)
+                              last = now; iters = 0; t0 = now
+                  torch.cuda.synchronize()
+              run(warm, "warmup")
+              for p in range(1, phases + 1):
+                  print(f"phase {p} burn", flush=True)
+                  run(burn, f"phase{p}")
+                  print(f"phase {p} idle", flush=True)
+                  time.sleep(idle)
+              print("DONE", flush=True)
+          resources:
+            limits:
+              nvidia.com/gpu: 1
+              cpu: 4
+              memory: 8Gi
+            requests:
+              nvidia.com/gpu: 1
+              cpu: 2
+              memory: 4Gi
