@@ -10,6 +10,9 @@ grep -q 'power.max_limit' /usr/local/sbin/gpu-profile \
 grep -q 'nvidia-smi -lgc' /usr/local/sbin/gpu-profile \
   && fail "gpu-profile still locks clocks (-lgc) — pre-v4.0" \
   || ok "no clock lock (v4.0)"
+[ -x /usr/local/sbin/gpu-offsets ] && grep -q 'gpu-offsets' /usr/local/sbin/gpu-profile \
+  && ok "VF offsets applied via gpu-offsets (v4.1)" \
+  || fail "gpu-offsets missing or not used by gpu-profile — pre-v4.1"
 grep -q 'compute) apply EXCLUSIVE_PROCESS' /usr/local/sbin/gpu-profile \
   && ok "compute: EXCLUSIVE_PROCESS set" \
   || fail "compute: missing EXCLUSIVE_PROCESS"
@@ -26,7 +29,7 @@ svc gpu-gaming.service  enabled
 # After boot: gaming mode should be active (gpu-gaming flips after gpu-profile)
 read -r pl plmax mode < <(nvidia-smi --query-gpu=power.limit,power.max_limit,compute_mode --format=csv,noheader,nounits 2>/dev/null | tr -d ',')
 [ "${pl:-x}" = "${plmax:-y}" ] && [ "${mode:-}" = "Default" ] \
-  && ok "GPU in gaming mode (PL=${pl}W = card max, Default)" \
+  && ok "GPU in gaming mode (PL=${pl}W = card max, Default; $(gpu-offsets 2>/dev/null))" \
   || warn "GPU not yet in gaming mode (PL=${pl:-?}/${plmax:-?}, ${mode:-?}) — run after gpu-gaming.service has fired"
 
 # Persistent telemetry (v2.3+) for Xid forensics

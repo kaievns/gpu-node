@@ -1,8 +1,11 @@
 #!/bin/bash
 # gpu-profile {compute|gaming} — see docs/architecture.md.
-# v4.0 (2026-09-12, RTX 5080): PL = card max, no clock lock. Modes differ
-# only in CUDA compute mode.
+# v4.1 (2026-09-12, RTX 5080): PL = card max, no clock lock, validated VF
+# offsets (+200 core / +1500 mem). Modes differ only in CUDA compute mode.
 set -uo pipefail
+
+CORE_OFFSET=200
+MEM_OFFSET=1500
 
 nvidia-smi -pm 1 >/dev/null 2>&1 || true
 PL_MAX=$(nvidia-smi --query-gpu=power.max_limit --format=csv,noheader,nounits | cut -d. -f1)
@@ -11,6 +14,7 @@ apply() {
   nvidia-smi -rgc >/dev/null 2>&1 || true
   nvidia-smi -rmc >/dev/null 2>&1 || true
   nvidia-smi -pl "$PL_MAX" >/dev/null
+  gpu-offsets "$CORE_OFFSET" "$MEM_OFFSET" >/dev/null 2>&1 || true
   nvidia-smi -c "$1" >/dev/null
   cpupower frequency-set -g performance >/dev/null 2>&1 \
     || for g in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
@@ -24,4 +28,4 @@ case "${1:-}" in
   *) echo "usage: gpu-profile {compute|gaming}" >&2; exit 2 ;;
 esac
 
-echo "applied ${1}: $(nvidia-smi --query-gpu=power.limit,compute_mode,clocks.max.sm --format=csv,noheader)"
+echo "applied ${1}: $(nvidia-smi --query-gpu=power.limit,compute_mode,clocks.max.sm --format=csv,noheader), $(gpu-offsets 2>/dev/null)"
