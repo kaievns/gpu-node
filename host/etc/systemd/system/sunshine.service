@@ -4,12 +4,12 @@ After=gamescope-headless.service network-online.target
 BindsTo=gamescope-headless.service
 
 [Service]
-User=kai
-Group=kai
+User=gamer
+Group=gamer
 SupplementaryGroups=input video render
-Environment=HOME=/home/kai
-Environment=XDG_RUNTIME_DIR=/run/user/1000
-Environment=PULSE_SERVER=unix:/run/user/1000/pulse/native
+Environment=HOME=/home/gamer
+Environment=XDG_RUNTIME_DIR=/run/user/1100
+Environment=PULSE_SERVER=unix:/run/user/1100/pulse/native
 ExecStart=/usr/bin/sunshine
 Restart=on-failure
 RestartSec=5

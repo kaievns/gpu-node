@@ -6,6 +6,7 @@ LOG=/var/log/kill-running-game.log
 ts(){ date "+%Y-%m-%d %H:%M:%S"; }
 exec >>"$LOG" 2>&1
 echo "[$(ts)] === game-kill triggered ==="
+GAME_USER="${GAME_USER:-gamer}"
 
 # Infrastructure processes we must never touch.
 # Note: includes "gamescopereaper" (the gamescope subreaper that hosts Steam),
@@ -15,10 +16,10 @@ EXCLUDE='^(steam|steamwebhelper|gamescope-wl|gamescopereaper|sunshine|bash|syste
 # A process is "the running game" if its cwd/cmdline/exe path matches.
 PATTERN='steamapps[/\\]+(common|compatdata)[/\\]|reaper SteamLaunch|wine[0-9]*-preloader|wineserver'
 
-# Enumerate matching kai processes. Track pid AND pgid so we can do an atomic
+# Enumerate matching $GAME_USER processes. Track pid AND pgid so we can do an atomic
 # pgrp-kill where it's safe (catches respawn races during shutdown).
 PIDS=""; PGIDS=""
-for pid in $(pgrep -u kai); do
+for pid in $(pgrep -u "$GAME_USER"); do
   [ -d /proc/$pid ] || continue
   comm=$(cat /proc/$pid/comm 2>/dev/null) || continue
   echo "$comm" | grep -qE "$EXCLUDE" && continue
@@ -83,7 +84,7 @@ fi
 
 # 3. Nudge gamescopereaper so it reaps inherited orphan zombies (best-effort —
 #    empirically does not always work, but harmless).
-GR_PIDS=$(pgrep -u kai -x gamescopereaper)
+GR_PIDS=$(pgrep -u "$GAME_USER" -x gamescopereaper)
 if [ -n "$GR_PIDS" ]; then
   echo "[$(ts)] SIGCHLD -> gamescopereaper:$GR_PIDS"
   for gr in $GR_PIDS; do kill -CHLD $gr 2>/dev/null; done

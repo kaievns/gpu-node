@@ -2,7 +2,7 @@
 Description=Standalone headless gamescope (HDR, Deck EDID, default 1280x800@90, stream-res overrides)
 After=systemd-user-sessions.service systemd-logind.service
 [Service]
-User=kai
+User=gamer
 PAMName=login
 TTYPath=/dev/tty8
 TTYReset=yes
@@ -11,7 +11,7 @@ TTYVTDisallocate=yes
 StandardInput=tty-fail
 StandardOutput=journal
 StandardError=journal
-Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=XDG_RUNTIME_DIR=/run/user/1100
 ExecStart=/usr/local/bin/gamescope-headless.sh
 Restart=no
 
