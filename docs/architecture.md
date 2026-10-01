@@ -267,7 +267,7 @@ a black stream or a capture of nothing. The unit graph encodes this:
 flowchart TD
     gp["gpu-profile.service<br/>boot: gpu-profile compute<br/>Before=k3s-agent"]
     gg["gpu-gaming.service<br/>gpu-profile gaming"]
-    gs["gamescope-headless.service<br/>user kai, PAM session on tty8<br/>gamescope --backend drm --hdr-enabled<br/>(grabs DRM master)"]
+    gs["gamescope-headless.service<br/>user gamer (sandboxed), PAM session on tty8<br/>gamescope --backend drm --hdr-enabled<br/>(grabs DRM master)"]
     steam["steam -gamepadui<br/>(child of gamescope — not a unit)"]
     sun["sunshine.service<br/>KMS capture + NVENC"]
 
@@ -324,3 +324,33 @@ devices, not nation-states. Layers, narrowest first:
 - **Blast-radius placement** — the controller is forbidden from scheduling
   on gpu-node itself (it would vanish every time the box sleeps), and
   `Recreate` strategy guarantees a single instance.
+
+## Game sandbox
+
+Games are the least trusted code on the box: closed third-party binaries
+running under Wine. The gaming stack therefore runs as `gamer` (uid 1100,
+[`sysusers.d/gamer.conf`](../host/etc/sysusers.d/gamer.conf)): no password,
+no login shell, no sudo, groups `seat`/`video`/`render` only. `kai` keeps
+admin and runs nothing game-related.
+
+| Unit | Filesystem | Network |
+|---|---|---|
+| `gamescope-headless` (Steam and every game) | system read-only, other homes hidden, private `/tmp`, other users' processes invisible, k3s and agent paths inaccessible, no privilege gain | internet only: private, CGNAT and link-local ranges denied (LAN, router, pod and service networks). DNS comes from a unit-only [`resolv.conf`](../host/etc/gaming-fence/resolv.conf) so the router can stay blocked. |
+| `sunshine` | same fence, without process hiding | localhost and the client subnets `172.16.1.0/24`, `172.20.1.0/24`; no internet |
+| `sunshine-disconnect-watchdog` | reads Sunshine's own log, writes only the game-kill log | none |
+
+The rules live in the `40-fence.conf` drop-ins. `rehydrate/host/80`
+verify probes them from inside each unit's cgroup and mount namespace.
+
+Accepted residual risk:
+
+- **Loopback stays open to games**, because Steam talks to itself over it.
+  Every local listener is authenticated or read-only: k3s (client certs),
+  containerd streaming (per-session URLs), gaming-agent (token),
+  CoolerControl (password), node_exporter and kube metrics (read-only).
+- **Sunshine keeps `CAP_SYS_ADMIN`** for KMS capture, so a compromised
+  Sunshine could undo its own fence. Games run in gamescope's unit, not
+  Sunshine's.
+- **The NVIDIA kernel driver is shared** with the cluster's CUDA jobs. A
+  driver exploit escapes any userspace sandbox; only a passthrough VM would
+  close that, and the single GPU rules it out.

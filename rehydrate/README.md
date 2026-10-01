@@ -2,7 +2,7 @@
 
 End-to-end rebuild of `gpu-node` (Gameland) from a fresh Arch base install.
 All host configs install from the tracked payload tree at [`../host/`](../host/)
-(filesystem-mirror layout: `etc/`, `boot/`, `usr/`, `opt/`, `home/kai/`, plus
+(filesystem-mirror layout: `etc/`, `boot/`, `usr/`, `opt/`, `home/gamer/`, plus
 package lists in `host/meta/`). There is **no sync prerequisite** — clone the
 repo and run. To check whether the live box has drifted *ahead* of the repo,
 run [`../scripts/sync-from-host.sh`](../scripts/sync-from-host.sh) on the box
@@ -13,8 +13,7 @@ and inspect the diff.
 the manual bootstrap in [`../docs/setup.md`](../docs/setup.md) (§§0–4):
 
 - Arch Linux base installed on `/dev/nvme0n1` (1G ESP / 32G swap / 150G `/` / rest `/home`)
-- Hostname `Gameland`, the node user (default `kai` — see `NODE_USER` below),
-  NOPASSWD sudo, SSH key
+- Hostname `Gameland`, the admin user `kai` with NOPASSWD sudo and an SSH key
 - Static IP `172.16.1.220/24`, gateway/DNS `172.16.1.254`
 - BIOS: ErP Disabled, Power On By PCIE Enabled, Above 4G Decoding, ReBAR, CSM off
 - A k3s control-plane node-token + the cluster kubeconfig on your kubectl machine
@@ -40,7 +39,6 @@ Or single-step `./rehydrate.sh host` (install then verify) and `./rehydrate.sh c
 
 | Var | Used by | What |
 |---|---|---|
-| `NODE_USER` | host/70, host/80 | The login user that runs PipeWire/Sunshine. Defaults to `kai`. The payload tree literally mirrors `home/kai/`; only the install *target* is parameterized. |
 | `K3S_URL` | host/90 | Cluster API endpoint, e.g. `https://172.16.1.1:6443` |
 | `K3S_TOKEN` | host/90 | Node-token from a control-plane node (`cat /var/lib/rancher/k3s/server/node-token`). Never written to disk by these scripts. |
 | `AGENT_TOKEN` | cluster/30 | Shared bearer token between controller and host agent. Normally you don't set this — see the token flow below. |
@@ -64,8 +62,9 @@ deletes the `/tmp` copy. The token never lands in the repo.
 | host/40 | nvidia            | nvidia-container-toolkit wiring + nvidia-persistenced + CDI | yes |
 | host/50 | cooling           | CoolerControl + watercurve config                  | yes |
 | host/60 | gpu-profile       | `gpu-profile` v3.0 + ordering services + 1Hz telemetry | yes |
+| host/65 | game-user         | unprivileged `gamer` account the gaming stack runs as (sysusers, linger, fenced DNS) | yes |
 | host/70 | audio             | PipeWire HRTF: SOFA fetch + HeSuVi IR derivation + filter-chains | yes |
-| host/80 | gaming-stack      | gamescope-headless + Sunshine + disconnect watchdog| yes |
+| host/80 | gaming-stack      | gamescope-headless + Sunshine + disconnect watchdog, sandboxed; verify probes the fences | yes |
 | host/85 | gaming-agent      | host FastAPI :8080 + idle-check timer + token gen  | yes |
 | host/90 | k3s-agent         | k3s agent join + registries.yaml + node config     | needs `K3S_TOKEN` |
 | cluster/10 | ns-rbac        | gpu-node-system namespace + ServiceAccount         | yes |
