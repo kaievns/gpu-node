@@ -13,7 +13,7 @@
 #   - /etc/gaming-agent/token — secret. Regenerate on restore:
 #       openssl rand -hex 32 | sudo tee /etc/gaming-agent/token
 #     and update the matching k8s Secret (gpu-node-controller-secret).
-#   - ~/.config/sunshine/sunshine_state.json — Sunshine creds + client
+#   - /home/gamer/.config/sunshine/sunshine_state.json — Sunshine creds + client
 #     pairings. Never in git; pair fresh on restore.
 #   - HRTF binaries (MIT_KEMAR_normal_pinna.sofa, oal+++.wav, ir_*.wav) —
 #     not git material; ir_*.wav are derived from oal+++.wav at install time
@@ -126,8 +126,13 @@ FILES=(
   usr/local/sbin/kill-running-game.sh
 
   # Sunshine config (sunshine_state.json deliberately not listed)
-  home/kai/.config/sunshine/sunshine.conf
-  home/kai/.config/sunshine/apps.json
+  home/gamer/.config/sunshine/sunshine.conf
+  home/gamer/.config/sunshine/apps.json
+
+  # game sandbox account + fenced DNS
+  etc/sysusers.d/gamer.conf
+  etc/tmpfiles.d/gamer.conf
+  etc/gaming-fence/resolv.conf
 )
 
 # systemd drop-in dirs synced whole (gpu-profile.service.d intentionally

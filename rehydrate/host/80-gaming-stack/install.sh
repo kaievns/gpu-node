@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # host/80-gaming-stack — gamescope-headless + Sunshine + disconnect watchdog
-# + udev uinput rule + Sunshine config for $NODE_USER.
+# + udev uinput rule + Sunshine config for $GAME_USER.
 #
 # NOTE: gamescope-revert.sh and gs-safe-ondisk.sh were deliberately dropped
 # from the payload (broken — referenced deleted units / out-of-repo backups).
@@ -8,7 +8,7 @@
 set -euo pipefail
 . "$(dirname "$0")/../../lib/common.sh"
 
-NODE_USER="${NODE_USER:-kai}"
+GAME_USER=gamer  # fixed: units hardcode gamer / uid 1100
 
 ensure_pkg gamescope xorg-xwayland seatd libmysofa
 pacman -Qq sunshine >/dev/null 2>&1 || ensure_aur_pkg sunshine
@@ -34,13 +34,12 @@ install_file 0644 root:root etc/systemd/system/sunshine-disconnect-watchdog.serv
 install_file 0644 root:root etc/udev/rules.d/99-uinput.rules /etc/udev/rules.d/99-uinput.rules
 sudo udevadm control --reload && sudo udevadm trigger /dev/uinput 2>/dev/null || true
 
-# Sunshine config in $NODE_USER's home. Payload path is literally home/kai/
-# (the tracked tree mirrors the original box); only the TARGET is parameterized.
-sudo -u "$NODE_USER" install -d "/home/$NODE_USER/.config/sunshine"
-sudo install -m 0644 -o "$NODE_USER" -g "$NODE_USER" \
-  "$PAYLOAD_DIR/home/kai/.config/sunshine/sunshine.conf" "/home/$NODE_USER/.config/sunshine/sunshine.conf"
-sudo install -m 0644 -o "$NODE_USER" -g "$NODE_USER" \
-  "$PAYLOAD_DIR/home/kai/.config/sunshine/apps.json"     "/home/$NODE_USER/.config/sunshine/apps.json"
+# Sunshine config in the gamer home.
+sudo -u "$GAME_USER" install -d "/home/$GAME_USER/.config/sunshine"
+sudo install -m 0644 -o "$GAME_USER" -g "$GAME_USER" \
+  "$PAYLOAD_DIR/home/gamer/.config/sunshine/sunshine.conf" "/home/$GAME_USER/.config/sunshine/sunshine.conf"
+sudo install -m 0644 -o "$GAME_USER" -g "$GAME_USER" \
+  "$PAYLOAD_DIR/home/gamer/.config/sunshine/apps.json"     "/home/$GAME_USER/.config/sunshine/apps.json"
 
 sudo systemctl daemon-reload
 sudo systemctl enable --now gamescope-headless.service

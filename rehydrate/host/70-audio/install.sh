@@ -13,7 +13,7 @@
 set -euo pipefail
 . "$(dirname "$0")/../../lib/common.sh"
 
-NODE_USER="${NODE_USER:-kai}"
+GAME_USER=gamer  # fixed: units hardcode gamer / uid 1100
 
 ensure_pkg pipewire pipewire-pulse wireplumber libmysofa curl
 
@@ -79,11 +79,11 @@ fi
 install_file 0644 root:root etc/pipewire/pipewire.conf.d/90-hrtf-surround.conf   /etc/pipewire/pipewire.conf.d/90-hrtf-surround.conf
 install_file 0644 root:root etc/pipewire/pipewire.conf.d/91-hesuvi-surround.conf /etc/pipewire/pipewire.conf.d/91-hesuvi-surround.conf
 
-# Ensure pipewire runs for $NODE_USER (linger so user services survive logouts)
-sudo loginctl enable-linger "$NODE_USER"
+# Ensure pipewire runs for $GAME_USER (linger so user services survive logouts)
+sudo loginctl enable-linger "$GAME_USER"
 # `env` carries the var explicitly — sudo's env_reset rejects bare VAR=x
 # assignments on the command line without a SETENV tag.
-sudo -u "$NODE_USER" env XDG_RUNTIME_DIR="/run/user/$(id -u "$NODE_USER")" \
+sudo -u "$GAME_USER" env XDG_RUNTIME_DIR="/run/user/$(id -u "$GAME_USER")" \
   systemctl --user restart pipewire pipewire-pulse wireplumber 2>/dev/null \
   || warn "couldn't restart user PipeWire (no user session?). Will pick up on next login."
 
