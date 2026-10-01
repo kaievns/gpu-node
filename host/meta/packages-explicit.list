@@ -5,6 +5,7 @@ base-devel
 bind
 btop
 clpeak
+coolercontrold
 cpupower
 cuda
 dos2unix
@@ -22,6 +23,7 @@ lib32-pipewire
 libva-nvidia-driver
 linux
 linux-firmware
+logrotate
 mangohud
 networkmanager
 nvidia-container-toolkit
@@ -36,8 +38,10 @@ pipewire
 pipewire-alsa
 pipewire-pulse
 python-fastapi
+python-nvidia-ml-py
 rsync
 steam
+stress-ng
 sudo
 sunshine
 sway
@@ -50,5 +54,4 @@ xorg-server
 xorg-xinit
 xorg-xrandr
 yay-bin
-yay-bin-debug
 zsh
