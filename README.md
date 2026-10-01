@@ -66,7 +66,7 @@ is mid-stream, because yanking the GPU kills NVENC under the running game.
 
 | Path | What |
 |---|---|
-| [host/](host/) | Curated host config payload, filesystem-mirror layout (`etc/`, `boot/`, `usr/`, `opt/`, `home/kai/`, `meta/` package lists). Rehydrate installs from here. |
+| [host/](host/) | Curated host config payload, filesystem-mirror layout (`etc/`, `boot/`, `usr/`, `opt/`, `home/gamer/`, `meta/` package lists). Rehydrate installs from here. |
 | [cluster/controller/](cluster/controller/) | The arbitration controller: namespace, RBAC, secret template, control-loop ConfigMap, Deployment, test-flip script. |
 | [cluster/device-plugin/](cluster/device-plugin/) | NVIDIA device plugin DaemonSet (tolerations tuned for this node's taints). |
 | [cluster/monitoring/](cluster/monitoring/) | dcgm-exporter manifests + custom counter CSV, Grafana dashboard ConfigMaps, alert rules + provisioning script. |
@@ -140,12 +140,12 @@ to change — there is no templating layer, on purpose:
 
 | Value | Mine | Lives in |
 |---|---|---|
-| Host static IP | `172.16.1.220/24` | [cluster/controller/04-configmap.yaml](cluster/controller/04-configmap.yaml) + [05-deployment.yaml](cluster/controller/05-deployment.yaml) (`AGENT_URL`), [host/home/kai/.config/sunshine/sunshine.conf](host/home/kai/.config/sunshine/sunshine.conf) (`csrf_allowed_origins`), [docs/setup.md](docs/setup.md) |
+| Host static IP | `172.16.1.220/24` | [cluster/controller/04-configmap.yaml](cluster/controller/04-configmap.yaml) + [05-deployment.yaml](cluster/controller/05-deployment.yaml) (`AGENT_URL`), [host/home/gamer/.config/sunshine/sunshine.conf](host/home/gamer/.config/sunshine/sunshine.conf) (`csrf_allowed_origins`), [docs/setup.md](docs/setup.md) |
 | Gateway / DNS | `172.16.1.254` (+ 1.1.1.1) | [docs/setup.md](docs/setup.md) |
 | WOL MAC | `58:11:22:b0:a6:af` | [cluster/controller/04-configmap.yaml](cluster/controller/04-configmap.yaml) + [05-deployment.yaml](cluster/controller/05-deployment.yaml) (`NODE_MAC`) |
 | NIC name | `enp7s0` | auto-detected by [rehydrate/host/30-network/install.sh](rehydrate/host/30-network/install.sh) (default-route interface) |
-| User | `kai` (uid 1000) | `host/home/kai/`, [host/etc/sudoers.d/gaming-agent](host/etc/sudoers.d/gaming-agent), unit files |
-| Hostname | `Gameland` | [sunshine.conf](host/home/kai/.config/sunshine/sunshine.conf) (`sunshine_name`, csrf origins), [docs/setup.md](docs/setup.md) |
+| Users | `kai` (uid 1000, admin), `gamer` (uid 1100, gaming stack) | [host/etc/sysusers.d/gamer.conf](host/etc/sysusers.d/gamer.conf), `host/home/gamer/`, unit files |
+| Hostname | `Gameland` | [sunshine.conf](host/home/gamer/.config/sunshine/sunshine.conf) (`sunshine_name`, csrf origins), [docs/setup.md](docs/setup.md) |
 | k8s node name | `gpu-node` | [host/etc/rancher/k3s/config.yaml](host/etc/rancher/k3s/config.yaml), referenced throughout `cluster/` |
 | Registry mirror | `registry.homelab` → `http://172.16.1.89/v2` | [host/etc/rancher/k3s/registries.yaml](host/etc/rancher/k3s/registries.yaml) |
 | k3s API servers | `https://172.16.1.1/.2/.3:6443` | prompted by [rehydrate/host/90-k3s-agent/install.sh](rehydrate/host/90-k3s-agent/install.sh), [docs/setup.md](docs/setup.md) |
