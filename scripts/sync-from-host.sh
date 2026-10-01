@@ -37,10 +37,10 @@ HOST_TREE="$REPO_ROOT/host"
 BACKUP_META="$REPO_ROOT/backup/meta"
 
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=10)
-# -s (--protect-args): remote paths pass verbatim, no remote-shell word
-# splitting if a manifest entry ever grows a space.
-RSYNC_OPTS=(-azs --timeout=20 --rsync-path='sudo rsync'
+RSYNC_OPTS=(-az --timeout=20 --rsync-path='sudo rsync'
             -e "ssh ${SSH_OPTS[*]}")
+# -s keeps remote paths verbatim; macOS openrsync lacks it (manifest has no spaces).
+rsync --help 2>&1 | grep -q -- '--protect-args' && RSYNC_OPTS+=(-s)
 
 # Failure accounting (bash-3.2-safe: no empty-array expansion under set -u).
 FAILED_COUNT=0
@@ -124,6 +124,8 @@ FILES=(
   usr/local/bin/gamescope-headless.sh
   usr/local/sbin/gpu-profile
   usr/local/sbin/kill-running-game.sh
+  usr/local/sbin/stream-res
+  etc/tmpfiles.d/gamescope-headless.conf
 
   # Sunshine config (sunshine_state.json deliberately not listed)
   home/gamer/.config/sunshine/sunshine.conf

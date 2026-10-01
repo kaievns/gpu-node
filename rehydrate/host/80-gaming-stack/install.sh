@@ -42,8 +42,8 @@ sudo install -m 0644 -o "$GAME_USER" -g "$GAME_USER" \
   "$PAYLOAD_DIR/home/gamer/.config/sunshine/apps.json"     "/home/$GAME_USER/.config/sunshine/apps.json"
 
 sudo systemctl daemon-reload
-sudo systemctl enable --now gamescope-headless.service
-# sunshine + watchdog pulled in via BindsTo/Wants from gamescope-headless.
+sudo systemctl enable gamescope-headless.service sunshine.service sunshine-disconnect-watchdog.service
+sudo systemctl start gamescope-headless.service sunshine-disconnect-watchdog.service
 
 warn "Sunshine pairing state NOT restored (sunshine_state.json is never in the repo) — pair the deck fresh at https://172.16.1.220:47990"
 ok "gaming stack installed"
