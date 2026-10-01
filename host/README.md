@@ -66,11 +66,6 @@ Comment-level and intentional. After a sync these show up as diffs — do
   since v3.0 (both modes PL370; the modes differ in compute mode and which
   services run). The repo copy carries the corrected comments. The code
   itself is identical — only `gpu-profile` knows the actual numbers.
-- [etc/pipewire/pipewire.conf.d/](etc/pipewire/pipewire.conf.d/) — both conf
-  headers carried stale priority claims from earlier iterations (HeSuVi
-  "200", BinauralBus "system default", Surround_HRTF "100"). The repo copies
-  describe the operative values: HeSuVi 3000 = default, BinauralBus 2000 =
-  Sunshine's capture bus, Surround_HRTF 50 but pinned via PULSE_SINK.
 
 ## Directory map
 

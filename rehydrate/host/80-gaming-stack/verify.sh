@@ -30,9 +30,14 @@ in_unit() {
     exec nsenter -t "$2" -m -- setpriv --reuid=gamer --regid=gamer --init-groups -- bash -c "$3"' \
     _ "$unit" "$pid" "$script"
 }
-tcp() { echo "timeout 6 bash -c 'exec 3<>/dev/tcp/$1/$2' 2>&1 && echo OPEN"; }
-blocked() { in_unit "$1" "$(tcp "$2" "$3")" | grep -q "not permitted"; }
-reachable() { in_unit "$1" "$(tcp "$2" "$3")" | grep -q "^OPEN$"; }
+# The IP filter drops silently, so "blocked" = answers from the host, times
+# out from inside the unit.
+tcp() { echo "timeout 4 bash -c 'exec 3<>/dev/tcp/$1/$2' 2>/dev/null && echo OPEN"; }
+reachable() { [ "$(in_unit "$1" "$(tcp "$2" "$3")")" = OPEN ]; }
+blocked() {
+  timeout 4 bash -c "exec 3<>/dev/tcp/$2/$3" 2>/dev/null || fail "probe target $2:$3 unreachable even from the host"
+  ! reachable "$1" "$2" "$3"
+}
 
 for p in gamescope-wl steam; do
   [ "$(ps -o user= -C "$p" | sort -u | xargs)" = gamer ] && ok "$p runs as gamer" || fail "$p not running as gamer"
@@ -52,7 +57,7 @@ in_unit $GS 'touch /usr/.fence-probe' 2>/dev/null && fail "games can write /usr"
 in_unit $GS 'grep -q "^nameserver 1.1.1.1" /etc/resolv.conf' && ok "games use fenced DNS" || fail "games use host DNS"
 in_unit $GS 'getent hosts api.steampowered.com >/dev/null' && ok "games resolve internet names" || fail "games cannot resolve names"
 reachable $GS 1.1.1.1 443      && ok "games reach the internet"          || fail "games cannot reach the internet"
-blocked   $GS 172.16.1.254 53  && ok "games blocked from LAN router"     || fail "games can reach the LAN router"
+blocked   $GS 172.16.1.254 80  && ok "games blocked from LAN router"     || fail "games can reach the LAN router"
 blocked   $GS 172.16.1.220 8080 && ok "games blocked from gaming-agent"  || fail "games can reach the gaming-agent"
 blocked   $GS 10.43.0.1 443    && ok "games blocked from k8s API service" || fail "games can reach the k8s API service"
 

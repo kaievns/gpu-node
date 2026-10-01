@@ -21,13 +21,8 @@ as_user() {
 as_user systemctl --user is-active pipewire >/dev/null 2>&1 \
   && ok "pipewire running for $GAME_USER" || warn "pipewire not running for $GAME_USER"
 
-# Filter-chain sinks
-as_user pw-dump 2>/dev/null \
-  | grep -qE '"node\.name":\s*"BinauralBus"' \
-  && ok "BinauralBus sink loaded" || fail "BinauralBus sink missing"
-as_user pw-dump 2>/dev/null \
-  | grep -qE '"node\.name":\s*"Surround_HeSuVi"' \
-  && ok "Surround_HeSuVi sink loaded" || fail "Surround_HeSuVi sink missing"
-as_user pw-dump 2>/dev/null \
-  | grep -qE '"node\.name":\s*"Surround_HRTF"' \
-  && ok "Surround_HRTF sink loaded" || fail "Surround_HRTF sink missing (PULSE_SINK target of gamescope-headless.sh)"
+# Filter-chain sinks (one dump: grep -q on a live pipe trips pipefail via SIGPIPE)
+dump=$(as_user pw-dump 2>/dev/null || true)
+for sink in BinauralBus Surround_HeSuVi Surround_HRTF; do
+  grep -qE "\"node\\.name\":\\s*\"$sink\"" <<<"$dump" && ok "$sink sink loaded" || fail "$sink sink missing"
+done
