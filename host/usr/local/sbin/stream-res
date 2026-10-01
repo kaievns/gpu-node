@@ -5,7 +5,7 @@ set -euo pipefail
 
 CONF_DIR=/etc/gamescope-headless
 CONF="$CONF_DIR/resolution"
-LOG=/tmp/gamescope-headless.log
+LOG=/home/gamer/.local/state/gamescope-headless.log
 
 usage() {
   cat <<EOF
@@ -17,7 +17,7 @@ EOF
   exit 1
 }
 
-mode_line() { grep -o "selecting mode .*" "$LOG" 2>/dev/null | tail -1; }
+mode_line() { sudo grep -o "selecting mode .*" "$LOG" 2>/dev/null | tail -1; }
 
 if [ "${1:-}" = status ]; then
   if [ -r "$CONF" ]; then echo "override: $(tr '\n' ' ' <"$CONF")"; else echo "override: none (deck 1280x800@90)"; fi
