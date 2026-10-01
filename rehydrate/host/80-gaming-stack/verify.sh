@@ -5,6 +5,7 @@ set -euo pipefail
 svc gamescope-headless.service active
 svc sunshine.service             active
 svc sunshine-disconnect-watchdog.service active
+for u in gamescope-headless sunshine sunshine-disconnect-watchdog; do svc "$u.service" enabled; done
 
 [ -x /usr/local/sbin/stream-res ] && ok "stream-res installed" || fail "stream-res missing"
 
