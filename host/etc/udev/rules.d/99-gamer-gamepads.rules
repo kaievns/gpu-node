@@ -1,0 +1,2 @@
+# Game sandbox: Steam (gamer) reads gamepads directly; gamer has no input group.
+SUBSYSTEM=="input", KERNEL=="event*|js*", ENV{ID_INPUT_JOYSTICK}=="1", OWNER="gamer"

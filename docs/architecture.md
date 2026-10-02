@@ -333,6 +333,13 @@ running under Wine. The gaming stack therefore runs as `gamer` (uid 1100,
 no login shell, no sudo, groups `seat`/`video`/`render` only. `kai` keeps
 admin and runs nothing game-related.
 
+Input is split the same way. Only Sunshine's unit gets the `input` group, for
+`/dev/uinput`. Steam reads gamepads directly, so a udev rule
+([`99-gamer-gamepads.rules`](../host/etc/udev/rules.d/99-gamer-gamepads.rules))
+makes `gamer` the owner of joystick nodes only. Keyboards and mice stay
+`root:input`; gamescope gets those through seatd. The usual `uaccess` route
+doesn't apply: gamescope's tty8 session is never the active VT.
+
 | Unit | Filesystem | Network |
 |---|---|---|
 | `gamescope-headless` (Steam and every game) | system read-only, other homes hidden, private `/tmp`, other users' processes invisible, k3s and agent paths inaccessible, no privilege gain | internet only: private, CGNAT and link-local ranges denied (LAN, router, pod and service networks). DNS comes from a unit-only [`resolv.conf`](../host/etc/gaming-fence/resolv.conf) so the router can stay blocked. |

@@ -116,6 +116,7 @@ FILES=(
 
   # uinput perms (Sunshine virtual gamepad)
   etc/udev/rules.d/99-uinput.rules
+  etc/udev/rules.d/99-gamer-gamepads.rules
 
   # Steam Deck EDID injected via kernel cmdline
   usr/lib/firmware/edid/steamdeck.bin
