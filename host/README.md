@@ -82,7 +82,7 @@ Comment-level and intentional. After a sync these show up as diffs — do
 | [etc/sudoers.d/](etc/sudoers.d/) | NOPASSWD allowlist for the `gaming-agent` user — exact systemctl/gpu-profile/suspend commands only. |
 | [etc/systemd/system/](etc/systemd/system/) | The unit graph: `gamescope-headless` (+ drop-ins for caps, deps, stop timeout, sandbox fence), `sunshine` (+ drop-ins enforcing DRM-master ordering — gamescope must grab DRM master before Sunshine's KMS capture attaches), `gaming-agent`, `gpu-profile` / `gpu-gaming` (boot-time profile), `gpu-idle-check.timer`, `gpu-telemetry`, `sunshine-qos`, `sunshine-disconnect-watchdog` (kills the running game on client disconnect). |
 | [etc/sysusers.d/](etc/sysusers.d/) | `gamer.conf` — the unprivileged account the gaming stack runs as. |
-| [etc/udev/rules.d/](etc/udev/rules.d/) | `99-uinput.rules` — uinput access for Sunshine's virtual gamepad. |
+| [etc/udev/rules.d/](etc/udev/rules.d/) | `99-uinput.rules` — uinput access for Sunshine's virtual gamepad. `99-gamer-gamepads.rules` — `gamer` owns joystick nodes so sandboxed Steam can read them. |
 | [home/gamer/.config/sunshine/](home/gamer/.config/sunshine/) | `sunshine.conf` (KMS capture, HEVC NVENC, `csrf_allowed_origins` as a plain comma list — JSON arrays are silently rejected) and `apps.json`. No state/credentials. |
 | [meta/](meta/) | pacman package lists (explicit / AUR / all), consumed by [rehydrate/host/10-packages](../rehydrate/host/10-packages/). |
 | [opt/gaming-agent/](opt/gaming-agent/) | `agent.py` — the FastAPI control plane on :8080 (`/status`, `/mode/compute`, `/mode/gaming`, `/sleep`; refuses compute flips mid-stream) — and `idle-check.sh` (suspends after 15 min idle in gaming mode). |

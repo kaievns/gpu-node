@@ -49,6 +49,14 @@ wd=$(systemctl show -p MainPID --value sunshine-disconnect-watchdog.service)
 steam_pid=$(pgrep -u gamer -x steam | head -1)
 ps -o supgrp= -p "$steam_pid" | grep -qw wheel && fail "steam has wheel" || ok "steam has no wheel group"
 
+pads=$(for d in /sys/class/input/event*; do udevadm info -q property "$d" | grep -qx ID_INPUT_JOYSTICK=1 && echo "/dev/input/${d##*/}"; done; true)
+if [ -z "$pads" ]; then
+  warn "no gamepad present (connect a Moonlight client to check gamepad access)"
+else
+  for p in $pads; do [ "$(stat -c %U "$p")" = gamer ] && ok "gamer owns gamepad $p" || fail "gamer cannot open gamepad $p"; done
+fi
+[ "$(stat -c %G /dev/input/event0)" = input ] && [ "$(stat -c %U /dev/input/event0)" = root ] && ok "non-gamepad input stays root:input" || fail "non-gamepad input ownership changed"
+
 GS=gamescope-headless.service
 [ "$(in_unit $GS 'ls -A /home')" = gamer ] && ok "games see only /home/gamer" || fail "games can see other homes"
 in_unit $GS 'test -r /etc/rancher/k3s/config.yaml' && fail "games can read k3s config" || ok "k3s config hidden from games"

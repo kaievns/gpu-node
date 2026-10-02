@@ -32,7 +32,9 @@ install_file 0644 root:root etc/systemd/system/sunshine-disconnect-watchdog.serv
 
 # udev rule — gives /dev/uinput perms to Sunshine for virtual gamepad
 install_file 0644 root:root etc/udev/rules.d/99-uinput.rules /etc/udev/rules.d/99-uinput.rules
+install_file 0644 root:root etc/udev/rules.d/99-gamer-gamepads.rules /etc/udev/rules.d/99-gamer-gamepads.rules
 sudo udevadm control --reload && sudo udevadm trigger /dev/uinput 2>/dev/null || true
+sudo udevadm trigger --subsystem-match=input --action=change
 
 # Sunshine config in the gamer home.
 sudo -u "$GAME_USER" install -d "/home/$GAME_USER/.config/sunshine"
