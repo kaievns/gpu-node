@@ -333,17 +333,18 @@ running under Wine. The gaming stack therefore runs as `gamer` (uid 1100,
 no login shell, no sudo, groups `seat`/`video`/`render` only. `kai` keeps
 admin and runs nothing game-related.
 
-Input is split the same way. Only Sunshine's unit gets the `input` group, for
-`/dev/uinput`. Steam reads gamepads directly, so a udev rule
+Input is split the same way. Only Sunshine's unit gets the `input` group.
+Steam reads gamepads directly and builds Steam Input's virtual pads through
+`/dev/uinput`, so udev makes `gamer` the owner of joystick nodes
 ([`99-gamer-gamepads.rules`](../host/etc/udev/rules.d/99-gamer-gamepads.rules))
-makes `gamer` the owner of joystick nodes only. Keyboards and mice stay
-`root:input`; gamescope gets those through seatd. The usual `uaccess` route
+and of `/dev/uinput` ([`99-uinput.rules`](../host/etc/udev/rules.d/99-uinput.rules)).
+Keyboards and mice stay `root:input`; gamescope gets those through seatd. The usual `uaccess` route
 doesn't apply: gamescope's tty8 session is never the active VT.
 
 | Unit | Filesystem | Network |
 |---|---|---|
-| `gamescope-headless` (Steam and every game) | system read-only, other homes hidden, private `/tmp`, other users' processes invisible, k3s and agent paths inaccessible, no privilege gain | internet only: private, CGNAT and link-local ranges denied (LAN, router, pod and service networks). DNS comes from a unit-only [`resolv.conf`](../host/etc/gaming-fence/resolv.conf) so the router can stay blocked. |
-| `sunshine` | same fence, without process hiding | localhost and the client subnets `172.16.1.0/24`, `172.20.1.0/24`; no internet |
+| `gamescope-headless` (Steam and every game) | system read-only, other homes hidden, private `/tmp`, k3s and agent paths inaccessible, no privilege gain | internet only: private, CGNAT and link-local ranges denied (LAN, router, pod and service networks). DNS comes from a unit-only [`resolv.conf`](../host/etc/gaming-fence/resolv.conf) so the router can stay blocked. |
+| `sunshine` | same fence | localhost and the client subnets `172.16.1.0/24`, `172.20.1.0/24`; no internet |
 | `sunshine-disconnect-watchdog` | reads Sunshine's own log, writes only the game-kill log | none |
 
 The rules live in the `40-fence.conf` drop-ins. `rehydrate/host/80`
@@ -355,6 +356,13 @@ Accepted residual risk:
   Every local listener is authenticated or read-only: k3s (client certs),
   containerd streaming (per-session URLs), gaming-agent (token),
   CoolerControl (password), node_exporter and kube metrics (read-only).
+- **Games can list other users' processes.** Easy Anti-Cheat fails with
+  "Launch Error: 261" under `hidepid`, so the fence leaves `/proc` alone.
+  Process names and command lines are visible; their memory, environment
+  and file descriptors are still protected by normal ptrace checks.
+- **Games can create virtual input devices** via `/dev/uinput`. A fake
+  keyboard reaches the tty1 login prompt, which needs kai's password and
+  locks after three failures (`pam_faillock`).
 - **Sunshine keeps `CAP_SYS_ADMIN`** for KMS capture, so a compromised
   Sunshine could undo its own fence. Games run in gamescope's unit, not
   Sunshine's.
