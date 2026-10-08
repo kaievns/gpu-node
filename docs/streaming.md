@@ -233,3 +233,12 @@ included) and refuses to run while a Moonlight client is connected unless
 Without a switch, a client requesting a non-matching resolution still
 works: Sunshine scales the current output into the requested size (softer,
 letterboxed across aspect ratios).
+
+## 7. Per-game workarounds
+
+| Game | Launch options | Why |
+|---|---|---|
+| Titanfall 2 | `DISABLE_GAMESCOPE_WSI=1 %command%`, Proton Experimental | gamescope 3.16.31's WSI layer crashes the EA app in `vkGetPhysicalDeviceSurfaceFormats2KHR` (null call, `c0000005 in Unix call`). The game then fails with "Failed to get Origin environment setting: The Origin desktop application is not loaded". Same crash on GE-Proton and Valve Proton; fine on 3.16.28. |
+
+`DISABLE_GAMESCOPE_WSI=1` costs only HDR for that game. Drop the workaround
+once a gamescope update stops the EA app crashing without it.
