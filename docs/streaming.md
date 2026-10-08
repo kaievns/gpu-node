@@ -242,3 +242,7 @@ letterboxed across aspect ratios).
 
 `DISABLE_GAMESCOPE_WSI=1` costs only HDR for that game. Drop the workaround
 once a gamescope update stops the EA app crashing without it.
+
+The EA in-game overlay is off for Titanfall 2: `user.igoEnabled=false` in the
+prefix's `AppData/Local/Electronic Arts/EA Desktop/user_<id>.ini`. Edit it
+only while the EA app is closed, and re-add it if the prefix is recreated.
