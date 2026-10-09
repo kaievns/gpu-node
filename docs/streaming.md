@@ -211,29 +211,43 @@ Remaining gotchas baked into that config, learned the hard way:
   are in `sunshine_state.json`, which is deliberately never synced into
   this repo.
 
-## 6. Multi-resolution clients (stream-res)
+## 6. Multi-resolution clients
 
-The injected EDID advertises more than the Deck's native mode (1080p, 1440p,
-4K are all in the KMS mode list), but gamescope fixes its output mode at
-launch — so serving a different client resolution pixel-natively means
-restarting the stack in the other mode. `stream-res` (run over SSH) does
-that in the DRM-master-safe order from §3, with auto-revert to the Deck
-default if the requested mode doesn't come up:
+The output mode follows each Moonlight client automatically, with no
+restart. On every connection Sunshine's `global_prep_cmd` runs
+[`stream-mode`](../host/usr/local/bin/stream-mode) with the client's
+`SUNSHINE_CLIENT_WIDTH/HEIGHT/FPS`. It picks a mode from gamescope's own list
+(`GAMESCOPE_DISPLAY_MODE_LIST_EXTERNAL`), writes it to gamescope's mode file
+and sets `GAMESCOPE_DISPLAY_MODE_NUDGE`, the same live-modeset path Steam
+uses for external displays on SteamOS. Both are X properties on gamescope's
+Xwayland, reachable from Sunshine's sandbox through the abstract socket.
+
+Picking rules: the client's exact size if offered, at the lowest refresh at
+or above its FPS (else the highest). Otherwise the largest mode that fits
+inside the client, preferring the same aspect ratio; Sunshine scales the
+rest. `stream-mode --self-test` covers the rules; it never fails a
+connection, it logs and leaves the mode alone.
+
+This only works because `gamescope-headless.sh` launches without
+`-W/-H/-r`: those set gamescope's preferred mode, which overrides the mode
+file. The mode file
+(`~gamer/.config/gamescope/modes.cfg`, line `Samsung Electric Company
+SAMSUNG:WxH@R`) is emptied at boot by `tmpfiles.d`, so the box always boots
+at the EDID's preferred 1280x800@90.
+
+`stream-res` pins a mode instead, for when automatic isn't wanted. It
+restarts gamescope + Sunshine with explicit flags (~20 s, Steam session
+included), refuses while a client is connected unless `--force`, and
+`stream-mode` stands down while a pin exists:
 
 ```
-stream-res status     # current override + live mode
-stream-res 1080p      # iPad: 1920x1080@60
-stream-res 1440p      # 2560x1440@60
-stream-res 1200p      # 1920x1200@120 (also @90, @60)
-stream-res 2560x1600@60   # any WxH[@R] the EDID offers
-stream-res deck       # back to 1280x800@90 (removes the override)
+stream-res status     # pinned or automatic, live mode
+stream-res 1200p      # pin 1920x1200@120
+stream-res 1080p      # pin 1920x1080@60
+stream-res 2560x1600@60   # pin any WxH[@R] the EDID offers
+stream-res deck       # unpin: automatic, back to 1280x800@90
 ```
 
-Mechanics: the override lives in `/etc/gamescope-headless/resolution`
-(`GS_W/GS_H/GS_R`, sourced by `gamescope-headless.sh`; absent = Deck
-native). The switch restarts gamescope + Sunshine (~20 s, Steam session
-included) and refuses to run while a Moonlight client is connected unless
-`--force`. The override clears on every reboot (`tmpfiles.d`) — the box always boots Deck-native; within a boot it persists across service restarts until changed.
 1920x1200 isn't in the Deck EDID. `gameland.bin` reuses three slots for it:
 the extension's duplicate 2560x1440@120 DTD becomes 1920x1200@120 (CVT
 reduced blanking, 317 MHz), and the 1152x864@75 and 1280x1024@60 standard
@@ -241,10 +255,6 @@ timings become 1920x1200@60 and @90. To add a mode, edit
 `scripts/gen-edid.py`, rerun it, test with the DRM debugfs
 `edid_override` before rebooting, and keep the preferred 1280x800@90 DTD
 first.
-
-Without a switch, a client requesting a non-matching resolution still
-works: Sunshine scales the current output into the requested size (softer,
-letterboxed across aspect ratios).
 
 ## 7. Per-game workarounds
 

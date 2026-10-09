@@ -15,5 +15,11 @@ export VKD3D_SHADER_CACHE_PATH=$HOME/.cache/vkd3d-proton
 export DXVK_STATE_CACHE_PATH=$HOME/.cache/dxvk
 LOG="${XDG_STATE_HOME:-$HOME/.local/state}/gamescope-headless.log"
 mkdir -p "$(dirname "$LOG")"
-[ -r /etc/gamescope-headless/resolution ] && . /etc/gamescope-headless/resolution
-exec gamescope --backend drm --prefer-output HDMI-A-1 -W "${GS_W:-1280}" -H "${GS_H:-800}" -r "${GS_R:-90}" --hdr-enabled -e -- steam -gamepadui > "$LOG" 2>&1
+# Mode follows the Moonlight client (stream-mode) unless stream-res pins one.
+export GAMESCOPE_MODE_SAVE_FILE="$HOME/.config/gamescope/modes.cfg"
+MODE=()
+if [ -r /etc/gamescope-headless/resolution ]; then
+  . /etc/gamescope-headless/resolution
+  MODE=(-W "$GS_W" -H "$GS_H" -r "$GS_R")
+fi
+exec gamescope --backend drm --prefer-output HDMI-A-1 "${MODE[@]}" --hdr-enabled -e -- steam -gamepadui > "$LOG" 2>&1
