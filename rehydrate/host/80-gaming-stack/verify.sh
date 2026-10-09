@@ -77,3 +77,23 @@ blocked $SS 1.1.1.1 443   && ok "sunshine blocked from the internet"      || fai
 blocked $SS 10.43.0.1 443 && ok "sunshine blocked from k8s API service"   || fail "sunshine can reach the k8s API service"
 capbnd=$(awk '/^CapBnd/{print $2}' "/proc/$(systemctl show -p MainPID --value $SS)/status")
 [ "$capbnd" = 0000000000a00000 ] && ok "sunshine capped to SYS_ADMIN+SYS_NICE" || fail "sunshine capability bound is $capbnd"
+
+# ── Per-client mode switching ────────────────────────────────────────────────
+/usr/local/bin/stream-mode --self-test >/dev/null && ok "stream-mode picker self-test passes" || fail "stream-mode self-test fails"
+sudo grep -qa "GAMESCOPE_MODE_SAVE_FILE=" "/proc/$(systemctl show -p MainPID --value $GS)/environ" \
+  && ok "gamescope reads the per-client mode file" || fail "gamescope started without GAMESCOPE_MODE_SAVE_FILE"
+sudo grep -q '^global_prep_cmd = .*stream-mode' /home/gamer/.config/sunshine/sunshine.conf \
+  && ok "Sunshine runs stream-mode on connect" || fail "Sunshine global_prep_cmd missing"
+last=$(sudo journalctl -u sunshine -b --no-pager -o cat | grep -E "CLIENT (CONNECTED|DISCONNECTED)" | tail -1) || true
+if [ -e /etc/gamescope-headless/resolution ]; then
+  warn "mode pinned by stream-res; skipping the live switch test"
+elif [[ "$last" == *"CLIENT CONNECTED"* ]]; then
+  warn "a client is connected; skipping the live switch test"
+else
+  for m in "1920 1200 120" "1280 800 90"; do
+    set -- $m
+    out=$(in_unit $SS "SUNSHINE_CLIENT_WIDTH=$1 SUNSHINE_CLIENT_HEIGHT=$2 SUNSHINE_CLIENT_FPS=$3 /usr/local/bin/stream-mode")
+    [[ "$out" == *"($1, $2, $3), switched"* || "$out" == *"($1, $2, $3), already active"* ]] \
+      && ok "live switch to ${1}x${2}@${3}" || fail "live switch to ${1}x${2}@${3}: $out"
+  done
+fi

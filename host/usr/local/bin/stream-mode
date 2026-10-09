@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+"""Switch gamescope's output live to the mode that best matches the Moonlight client.
+
+Run by Sunshine's global_prep_cmd on every connection (SUNSHINE_CLIENT_WIDTH,
+SUNSHINE_CLIENT_HEIGHT, SUNSHINE_CLIENT_FPS). Never fails the connection.
+See docs/streaming.md §6. `stream-mode --self-test` checks the mode picker.
+"""
+import os
+import pathlib
+import pwd
+import re
+import subprocess
+import sys
+import time
+
+DISPLAY_DESC = "Samsung Electric Company SAMSUNG"
+HOME = pathlib.Path(pwd.getpwuid(os.getuid()).pw_dir)
+MODE_FILE = HOME / ".config/gamescope/modes.cfg"
+GAMESCOPE_LOG = HOME / ".local/state/gamescope-headless.log"
+PIN_FILE = pathlib.Path("/etc/gamescope-headless/resolution")
+XENV = {**os.environ, "DISPLAY": ":0"}
+
+
+def parse_modes(text):
+    return sorted({tuple(map(int, m)) for m in re.findall(r"(\d+)x(\d+)@(\d+)", text)})
+
+
+def refresh_for(modes, w, h, fps):
+    rates = sorted(r for mw, mh, r in modes if (mw, mh) == (w, h))
+    at_least = [r for r in rates if r >= fps]
+    return at_least[0] if at_least else rates[-1]
+
+
+def pick(modes, w, h, fps):
+    sizes = {(mw, mh) for mw, mh, _ in modes}
+    if (w, h) in sizes:
+        size = (w, h)
+    else:
+        fits = [s for s in sizes if s[0] <= w and s[1] <= h]
+        same_aspect = [s for s in fits if abs(s[0] * h - s[1] * w) <= 0.01 * s[0] * h]
+        pool = same_aspect or fits
+        size = max(pool, key=lambda s: s[0] * s[1]) if pool else min(sizes, key=lambda s: s[0] * s[1])
+    return (*size, refresh_for(modes, *size, fps))
+
+
+def current_mode():
+    try:
+        lines = re.findall(r"selecting mode (\d+)x(\d+)@(\d+)Hz", GAMESCOPE_LOG.read_text(errors="replace"))
+    except OSError:
+        return None
+    return tuple(map(int, lines[-1])) if lines else None
+
+
+def switch(mode):
+    w, h, r = mode
+    MODE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = MODE_FILE.with_suffix(".tmp")
+    tmp.write_text(f"{DISPLAY_DESC}:{w}x{h}@{r}\n")
+    tmp.replace(MODE_FILE)
+    subprocess.run(["xprop", "-root", "-f", "GAMESCOPE_DISPLAY_MODE_NUDGE", "32c",
+                    "-set", "GAMESCOPE_DISPLAY_MODE_NUDGE", "1"], env=XENV, check=True, timeout=5)
+    for _ in range(50):
+        if current_mode() == mode:
+            return True
+        time.sleep(0.1)
+    return False
+
+
+def main():
+    if PIN_FILE.exists():
+        print("stream-mode: pinned by stream-res, leaving the mode alone")
+        return
+    try:
+        want = tuple(int(os.environ[f"SUNSHINE_CLIENT_{k}"]) for k in ("WIDTH", "HEIGHT", "FPS"))
+    except (KeyError, ValueError):
+        print("stream-mode: no client resolution in the environment, nothing to do")
+        return
+    listing = subprocess.run(["xprop", "-root", "GAMESCOPE_DISPLAY_MODE_LIST_EXTERNAL"],
+                             env=XENV, capture_output=True, text=True, timeout=5).stdout
+    modes = parse_modes(listing.split("=", 1)[-1])
+    if not modes:
+        print("stream-mode: gamescope published no modes, leaving the mode alone")
+        return
+    mode = pick(modes, *want)
+    if current_mode() == mode:
+        print(f"stream-mode: client {want} -> {mode}, already active")
+        return
+    ok = switch(mode)
+    print(f"stream-mode: client {want} -> {mode}, {'switched' if ok else 'NOT confirmed by gamescope'}")
+
+
+SAMPLE = ("1280x800@90 4096x2160@60 3840x2160@60 2560x1440@120 1920x1200@120 1920x1200@90 "
+          "1920x1200@60 1920x1080@120 1920x1080@100 1920x1080@60 1680x1050@60 1600x900@60 "
+          "1440x900@60 1280x800@60 1280x720@60 1024x768@60 640x480@60 3840x2160@30")
+CASES = [
+    ((1280, 800, 90), (1280, 800, 90)),
+    ((1280, 800, 60), (1280, 800, 60)),
+    ((1920, 1200, 120), (1920, 1200, 120)),
+    ((1920, 1200, 90), (1920, 1200, 90)),
+    ((1920, 1200, 60), (1920, 1200, 60)),
+    ((1920, 1080, 60), (1920, 1080, 60)),
+    ((1920, 1080, 90), (1920, 1080, 100)),
+    ((1920, 1080, 144), (1920, 1080, 120)),
+    ((2560, 1600, 120), (1920, 1200, 120)),
+    ((3440, 1440, 100), (2560, 1440, 120)),
+    ((3840, 2160, 60), (3840, 2160, 60)),
+    ((800, 480, 60), (640, 480, 60)),
+    ((320, 240, 30), (640, 480, 60)),
+]
+
+
+def self_test():
+    modes = parse_modes(SAMPLE)
+    bad = [(req, want, pick(modes, *req)) for req, want in CASES if pick(modes, *req) != want]
+    for req, want, got in bad:
+        print(f"FAIL client {req}: want {want}, got {got}")
+    print(f"stream-mode self-test: {len(CASES) - len(bad)}/{len(CASES)} passed")
+    sys.exit(1 if bad else 0)
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["--self-test"]:
+        self_test()
+    try:
+        main()
+    except Exception as e:  # never block a stream on a mode-switch problem
+        print(f"stream-mode: {type(e).__name__}: {e}; leaving the mode alone")

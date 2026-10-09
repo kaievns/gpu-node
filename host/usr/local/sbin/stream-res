@@ -1,16 +1,18 @@
 #!/bin/bash
-# Switch the headless stream output mode. Restarts gamescope + Sunshine
-# (~20 s, Steam session included). See docs/streaming.md §6.
+# Pin the headless stream output mode, overriding the per-client switching
+# done by stream-mode. Restarts gamescope + Sunshine (~20 s, Steam session
+# included). `deck` unpins. See docs/streaming.md §6.
 set -euo pipefail
 
 CONF_DIR=/etc/gamescope-headless
 CONF="$CONF_DIR/resolution"
+MODE_FILE=/home/gamer/.config/gamescope/modes.cfg
 LOG=/home/gamer/.local/state/gamescope-headless.log
 
 usage() {
   cat <<EOF
 usage: stream-res <preset|WxH[@R]> [--force] | status
-presets: deck  = 1280x800@90 (default, no override file)
+presets: deck  = unpin: automatic per client, starting at 1280x800@90
          1080p = 1920x1080@60
          1440p = 2560x1440@60
          1200p = 1920x1200@120
@@ -21,7 +23,7 @@ EOF
 mode_line() { sudo grep -o "selecting mode .*" "$LOG" 2>/dev/null | tail -1; }
 
 if [ "${1:-}" = status ]; then
-  if [ -r "$CONF" ]; then echo "override: $(tr '\n' ' ' <"$CONF")"; else echo "override: none (deck 1280x800@90)"; fi
+  if [ -r "$CONF" ]; then echo "pinned: $(tr '\n' ' ' <"$CONF")"; else echo "pinned: no (automatic per client; last request: $(sudo cat "$MODE_FILE" 2>/dev/null | cut -d: -f2 | tr -d '\n' || true))"; fi
   echo "gamescope: $(systemctl is-active gamescope-headless || true) [$(mode_line || echo n/a)]"
   echo "sunshine:  $(systemctl is-active sunshine || true)"
   exit 0
@@ -53,6 +55,7 @@ fi
 write_conf() {
   if [ "$1" = 1280 ] && [ "$2" = 800 ] && [ "$3" = 90 ]; then
     sudo rm -f "$CONF"
+    sudo truncate -s 0 "$MODE_FILE" 2>/dev/null || true
   else
     sudo mkdir -p "$CONF_DIR"
     printf 'GS_W=%s\nGS_H=%s\nGS_R=%s\n' "$1" "$2" "$3" | sudo tee "$CONF" >/dev/null

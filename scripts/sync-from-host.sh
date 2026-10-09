@@ -127,6 +127,7 @@ FILES=(
   usr/local/sbin/gpu-profile
   usr/local/sbin/kill-running-game.sh
   usr/local/sbin/stream-res
+  usr/local/bin/stream-mode
   etc/tmpfiles.d/gamescope-headless.conf
 
   # Sunshine config (sunshine_state.json deliberately not listed)
