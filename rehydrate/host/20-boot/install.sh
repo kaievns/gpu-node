@@ -6,6 +6,7 @@ set -euo pipefail
 
 # Inject the real Steam Deck EDID firmware (256B HDR10).
 install_file 0644 root:root usr/lib/firmware/edid/steamdeck.bin /usr/lib/firmware/edid/steamdeck.bin
+install_file 0644 root:root usr/lib/firmware/edid/gameland.bin  /usr/lib/firmware/edid/gameland.bin
 
 # ╔══════════════════════════════════════════════════════════════════════╗
 # ║ MACHINE-SPECIFIC UUIDs AHEAD.                                        ║

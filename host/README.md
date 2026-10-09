@@ -71,7 +71,7 @@ Comment-level and intentional. After a sync these show up as diffs — do
 
 | Path | What |
 |---|---|
-| [boot/loader/](boot/loader/) | systemd-boot config. `entries/arch.conf` carries the load-bearing kernel cmdline: `drm.edid_firmware=HDMI-A-1:edid/steamdeck.bin video=HDMI-A-1:e`, `nvidia_drm.modeset=1 fbdev=1`, `resume=` (hibernate swap). |
+| [boot/loader/](boot/loader/) | systemd-boot config. `entries/arch.conf` carries the load-bearing kernel cmdline: `drm.edid_firmware=HDMI-A-1:edid/gameland.bin video=HDMI-A-1:e`, `nvidia_drm.modeset=1 fbdev=1`, `resume=` (hibernate swap). |
 | [etc/coolercontrol/](etc/coolercontrol/) | CoolerControl daemon config: rad fans (nct6798 fan1/fan2) on the "watercurve" driven by coolant temp (asusec `T_Sensor`); pump (AIO_PUMP) pinned 100%. |
 | [etc/gaming-agent/](etc/gaming-agent/) | `token.example` only — recipe for generating the bearer token and its k8s Secret twin. The real token is never tracked. |
 | [etc/gaming-fence/](etc/gaming-fence/) | `resolv.conf` bind-mounted into the game sandbox (Cloudflare DNS, so the LAN router stays blocked). |
@@ -86,6 +86,6 @@ Comment-level and intentional. After a sync these show up as diffs — do
 | [home/gamer/.config/sunshine/](home/gamer/.config/sunshine/) | `sunshine.conf` (KMS capture, HEVC NVENC, `csrf_allowed_origins` as a plain comma list — JSON arrays are silently rejected) and `apps.json`. No state/credentials. |
 | [meta/](meta/) | pacman package lists (explicit / AUR / all), consumed by [rehydrate/host/10-packages](../rehydrate/host/10-packages/). |
 | [opt/gaming-agent/](opt/gaming-agent/) | `agent.py` — the FastAPI control plane on :8080 (`/status`, `/mode/compute`, `/mode/gaming`, `/sleep`; refuses compute flips mid-stream) — and `idle-check.sh` (suspends after 15 min idle in gaming mode). |
-| [usr/lib/firmware/edid/](usr/lib/firmware/edid/) | `steamdeck.bin` — the vendored EDID (attribution above). |
+| [usr/lib/firmware/edid/](usr/lib/firmware/edid/) | `steamdeck.bin` — the vendored EDID (attribution above). `gameland.bin` — the injected one, derived from it by `scripts/gen-edid.py` to add 1920x1200 at 60/90/120 Hz. |
 | [usr/local/bin/](usr/local/bin/) | `gamescope-headless.sh` — gamescope-DRM launch: HDR env, shader caches, `PULSE_SINK` pin routing game audio into the surround chain. |
 | [usr/local/sbin/](usr/local/sbin/) | `gpu-profile` (the compute/gaming profiles, with full version history in comments), `gpu-telemetry.sh` (1 Hz power/temp/clock/throttle-bitmap log for post-Xid forensics), `kill-running-game.sh` (kills the game tree, leaves the stack up). |

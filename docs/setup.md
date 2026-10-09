@@ -279,7 +279,7 @@ The live entry is tracked at
 ```
 options root=UUID=cd96...d30 rw resume=UUID=6919...4b9 iommu=pt
         nvidia_drm.modeset=1 acpi_enforce_resources=lax nvidia_drm.fbdev=1
-        drm.edid_firmware=HDMI-A-2:edid/steamdeck.bin video=HDMI-A-2:e
+        drm.edid_firmware=HDMI-A-1:edid/gameland.bin video=HDMI-A-1:e
 ```
 
 One line each:
@@ -291,8 +291,8 @@ One line each:
 | `iommu=pt` | IOMMU passthrough mode; effectively a no-op here (no VFIO), harmless leftover from the build |
 | `nvidia_drm.modeset=1` | NVIDIA KMS — required for gamescope's DRM backend and Sunshine's KMS capture; without it the whole headless gaming stack is dead |
 | `nvidia_drm.fbdev=1` | framebuffer device on top of nvidia-drm, keeps a usable kernel console on this no-Xorg box |
-| `drm.edid_firmware=HDMI-A-2:edid/steamdeck.bin` | kernel-injects the vendored, *valid* Steam Deck EDID ([`host/usr/lib/firmware/edid/steamdeck.bin`](../host/usr/lib/firmware/edid/steamdeck.bin)) — nvidia-modeset cannot read dummy-plug EDIDs over DDC and silently ignores *invalid* injected ones; only a valid EDID gets you the 1280x800@90 HDR mode |
-| `video=HDMI-A-2:e` | forces that connector enabled regardless of hot-plug detect |
+| `drm.edid_firmware=HDMI-A-1:edid/gameland.bin` | kernel-injects a *valid* EDID derived from the vendored Steam Deck one ([`host/usr/lib/firmware/edid/gameland.bin`](../host/usr/lib/firmware/edid/gameland.bin), see [streaming.md §6](streaming.md)) — nvidia-modeset cannot read dummy-plug EDIDs over DDC and silently ignores *invalid* injected ones; only a valid EDID gets you the 1280x800@90 HDR mode |
+| `video=HDMI-A-1:e` | forces that connector enabled regardless of hot-plug detect |
 | `acpi_enforce_resources=lax` | lets the `nct6775` driver write fan PWM registers in an I/O region ACPI also claims — required for CoolerControl on this ASUS board (coolercontrold auto-added it on first run; now pinned here) |
 
 Gotchas:

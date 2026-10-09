@@ -120,6 +120,7 @@ FILES=(
 
   # Steam Deck EDID injected via kernel cmdline
   usr/lib/firmware/edid/steamdeck.bin
+  usr/lib/firmware/edid/gameland.bin
 
   # scripts
   usr/local/bin/gamescope-headless.sh
