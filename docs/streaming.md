@@ -12,7 +12,7 @@ work.
 ```mermaid
 flowchart LR
     subgraph kernel ["Kernel / KMS"]
-        EDID["steamdeck.bin EDID<br/>(drm.edid_firmware=)"] --> CONN["HDMI-A-1<br/>1280x800@90, HDR10"]
+        EDID["gameland.bin EDID<br/>(drm.edid_firmware=)"] --> CONN["HDMI-A-1<br/>1280x800@90, HDR10"]
     end
     subgraph session ["gamescope session (DRM master)"]
         CONN --> GS["gamescope --backend drm<br/>--hdr-enabled"]
@@ -103,12 +103,15 @@ narrower than the internet suggests:
    pretending to be), from
    [Bloodhundur/steamdeckedid](https://github.com/Bloodhundur/steamdeckedid),
    vendored at [`host/usr/lib/firmware/edid/steamdeck.bin`](../host/usr/lib/firmware/edid/steamdeck.bin).
+   The box injects [`gameland.bin`](../host/usr/lib/firmware/edid/gameland.bin),
+   derived from it by [`scripts/gen-edid.py`](../scripts/gen-edid.py) to add
+   1920x1200 at 60/90/120 Hz (§6).
 2. **Kernel-inject it and force the connector on** — from
    [`host/boot/loader/entries/arch.conf`](../host/boot/loader/entries/arch.conf):
 
    ```
    nvidia_drm.modeset=1 nvidia_drm.fbdev=1
-   drm.edid_firmware=HDMI-A-1:edid/steamdeck.bin video=HDMI-A-1:e
+   drm.edid_firmware=HDMI-A-1:edid/gameland.bin video=HDMI-A-1:e
    ```
 
    The EDID lives under `/usr/lib/firmware`, so rebuild the initramfs
@@ -221,6 +224,7 @@ default if the requested mode doesn't come up:
 stream-res status     # current override + live mode
 stream-res 1080p      # iPad: 1920x1080@60
 stream-res 1440p      # 2560x1440@60
+stream-res 1200p      # 1920x1200@120 (also @90, @60)
 stream-res 2560x1600@60   # any WxH[@R] the EDID offers
 stream-res deck       # back to 1280x800@90 (removes the override)
 ```
@@ -230,6 +234,14 @@ Mechanics: the override lives in `/etc/gamescope-headless/resolution`
 native). The switch restarts gamescope + Sunshine (~20 s, Steam session
 included) and refuses to run while a Moonlight client is connected unless
 `--force`. The override clears on every reboot (`tmpfiles.d`) — the box always boots Deck-native; within a boot it persists across service restarts until changed.
+1920x1200 isn't in the Deck EDID. `gameland.bin` reuses three slots for it:
+the extension's duplicate 2560x1440@120 DTD becomes 1920x1200@120 (CVT
+reduced blanking, 317 MHz), and the 1152x864@75 and 1280x1024@60 standard
+timings become 1920x1200@60 and @90. To add a mode, edit
+`scripts/gen-edid.py`, rerun it, test with the DRM debugfs
+`edid_override` before rebooting, and keep the preferred 1280x800@90 DTD
+first.
+
 Without a switch, a client requesting a non-matching resolution still
 works: Sunshine scales the current output into the requested size (softer,
 letterboxed across aspect ratios).

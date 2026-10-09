@@ -13,6 +13,7 @@ usage: stream-res <preset|WxH[@R]> [--force] | status
 presets: deck  = 1280x800@90 (default, no override file)
          1080p = 1920x1080@60
          1440p = 2560x1440@60
+         1200p = 1920x1200@120
 EOF
   exit 1
 }
@@ -30,6 +31,7 @@ case "${1:-}" in
   deck)  W=1280 H=800  R=90 ;;
   1080p) W=1920 H=1080 R=60 ;;
   1440p) W=2560 H=1440 R=60 ;;
+  1200p) W=1920 H=1200 R=120 ;;
   *x*@*) W=${1%%x*} H=${1#*x}; H=${H%@*}; R=${1##*@} ;;
   *x*)   W=${1%%x*} H=${1#*x} R=60 ;;
   *) usage ;;
@@ -40,7 +42,7 @@ grep -qx "${W}x${H}" /sys/class/drm/card*-HDMI-A-1/modes || {
   echo "error: ${W}x${H} not offered by the injected EDID (see */modes)"; exit 1; }
 
 if [ "${2:-}" != --force ]; then
-  last=$(sudo journalctl -u sunshine -b --no-pager | grep -E "CLIENT (CONNECTED|DISCONNECTED)" | tail -1)
+  last=$(sudo journalctl -u sunshine -b --no-pager | grep -E "CLIENT (CONNECTED|DISCONNECTED)" | tail -1) || true
   case "$last" in *"CLIENT CONNECTED"*)
     echo "refusing: a client looks connected (--force to override)"
     echo "  $last"
