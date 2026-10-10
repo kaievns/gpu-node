@@ -262,6 +262,14 @@ first.
 |---|---|---|
 | Titanfall 2 | `DISABLE_GAMESCOPE_WSI=1 %command%`, Proton Experimental | gamescope 3.16.31's WSI layer crashes the EA app in `vkGetPhysicalDeviceSurfaceFormats2KHR` (null call, `c0000005 in Unix call`). The game then fails with "Failed to get Origin environment setting: The Origin desktop application is not loaded". Same crash on GE-Proton and Valve Proton; fine on 3.16.28. |
 
+Titanfall 2 campaign: **Continue** can crash on some checkpoints (seen mid
+Blood and Rust, inside BT). Restoring the save sets auto-exposure through
+`dev/exposure_log_luminance`, a material the game only creates on its first
+3D post-processed frame, and the video-backed main menu never draws one, so
+client.dll reads a null pointer (`client.dll+0x3664d1`). Matches Windows
+reports for that mission. Start the mission from **Mission Select** instead;
+fresh level starts work.
+
 `DISABLE_GAMESCOPE_WSI=1` costs only HDR for that game. Drop the workaround
 once a gamescope update stops the EA app crashing without it.
 
