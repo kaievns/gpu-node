@@ -100,3 +100,37 @@ else
       && ok "live switch to ${1}x${2}@${3}" || fail "live switch to ${1}x${2}@${3}: $out"
   done
 fi
+
+# ── HDR / SDR ────────────────────────────────────────────────────────────────
+/usr/local/bin/stream-hdr --self-test >/dev/null && ok "stream-hdr policy self-test passes" || fail "stream-hdr self-test fails"
+sudo grep -q '"do":"/usr/local/bin/stream-hdr","undo":"/usr/local/bin/stream-hdr --default"' /home/gamer/.config/sunshine/sunshine.conf \
+  && ok "Sunshine runs stream-hdr on connect and --default on session end" || fail "Sunshine global_prep_cmd lacks stream-hdr"
+sudo grep -qaF "Running script file '/etc/gamescope/scripts/50-stream-hdr.lua'" /home/gamer/.local/state/gamescope-headless.log \
+  && ok "gamescope loaded the stream-hdr display profile" || fail "gamescope did not load 50-stream-hdr.lua"
+hdr_prop() { in_unit $SS "DISPLAY=:0 xprop -root $1" | grep -o '[0-9]*$'; }
+hdr_out() { echo "$(hdr_prop GAMESCOPE_DISPLAY_SUPPORTS_HDR)$(hdr_prop GAMESCOPE_HDR_OUTPUT_FEEDBACK)"; }
+if [ -e /etc/gamescope-headless/hdr ]; then
+  warn "HDR policy is '$(cat /etc/gamescope-headless/hdr)'; skipping the SDR default and live HDR tests"
+elif [ "$(hdr_out)" != 00 ]; then
+  fail "no HDR policy but gamescope offers or outputs HDR ($(hdr_out))"
+else
+  ok "stream output is SDR by default"
+  last=$(sudo journalctl -u sunshine -b --no-pager -o cat | grep -E "CLIENT (CONNECTED|DISCONNECTED)" | tail -1) || true
+  if [[ "$last" == *"CLIENT CONNECTED"* ]]; then
+    warn "a client is connected; skipping the live HDR test"
+  else
+    trap 'sudo rm -f /etc/gamescope-headless/hdr; in_unit $SS "/usr/local/bin/stream-hdr --default" >/dev/null' EXIT
+    sudo mkdir -p /etc/gamescope-headless
+    echo auto | sudo tee /etc/gamescope-headless/hdr >/dev/null
+    out=$(in_unit $SS "SUNSHINE_CLIENT_HDR=true /usr/local/bin/stream-hdr")
+    case "$out" in
+      *"-> HDR, switched"*) ok "live switch to HDR for an HDR client" ;;
+      *"Steam's own HDR setting is off"*) warn "HDR allowed but Steam's Display > HDR setting is off" ;;
+      *) fail "live switch to HDR: $out" ;;
+    esac
+    out=$(in_unit $SS "SUNSHINE_CLIENT_HDR=false /usr/local/bin/stream-hdr")
+    [[ "$out" == *"-> SDR, switched"* && "$(hdr_out)" == 00 ]] && ok "live switch back to SDR for an SDR client" || fail "live switch to SDR: $out"
+    sudo rm -f /etc/gamescope-headless/hdr
+    trap - EXIT
+  fi
+fi

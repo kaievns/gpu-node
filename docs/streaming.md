@@ -3,7 +3,8 @@
 How Gameland streams games: a headless Arch box (RTX 3080 10GB, nvidia-open
 595.71.05, no monitor, no dummy plug) running gamescope on bare DRM with a
 kernel-injected Steam Deck EDID, captured by Sunshine over KMS, decoded by
-Moonlight on a Steam Deck OLED — 1280×800@90, HDR10, HEVC 10-bit.
+Moonlight on a Steam Deck OLED — 1280×800@90, HEVC 10-bit, HDR10 on request
+(SDR by default, §8).
 
 It did not start out this way. This doc is the story of why each piece is
 there, because every piece replaced something that looked simpler and didn't
@@ -178,7 +179,7 @@ again:
 | Piece | Setting | Where |
 |---|---|---|
 | Display | HDMI-A-1, 1280×800@90, HDR10, kernel-injected Deck EDID | [`host/boot/loader/entries/arch.conf`](../host/boot/loader/entries/arch.conf) |
-| Compositor | gamescope DRM backend, `--hdr-enabled`, launches `steam -gamepadui` | [`host/usr/local/bin/gamescope-headless.sh`](../host/usr/local/bin/gamescope-headless.sh) |
+| Compositor | gamescope DRM backend, `--hdr-enabled` (SDR unless `stream-hdr` allows HDR, §8), launches `steam -gamepadui` | [`host/usr/local/bin/gamescope-headless.sh`](../host/usr/local/bin/gamescope-headless.sh) |
 | Session unit | tty8 login session via `PAMName=login`, caps dropped (Steam bwrap) | [`host/etc/systemd/system/gamescope-headless.service`](../host/etc/systemd/system/gamescope-headless.service) + [drop-ins](../host/etc/systemd/system/gamescope-headless.service.d/) |
 | Capture/encode | Sunshine `capture = kms`, `encoder = nvenc`, HEVC Main10 HDR | [`host/home/gamer/.config/sunshine/sunshine.conf`](../host/home/gamer/.config/sunshine/sunshine.conf) |
 | Bitrate | no server cap (client sets it), `fec_percentage = 20` | same |
@@ -279,3 +280,38 @@ once a gamescope update stops the EA app crashing without it.
 The EA in-game overlay is off for Titanfall 2: `user.igoEnabled=false` in the
 prefix's `AppData/Local/Electronic Arts/EA Desktop/user_<id>.ini`. Edit it
 only while the EA app is closed, and re-add it if the prefix is recreated.
+
+## 8. HDR and SDR
+
+The stream is SDR by default. HDR is a policy, switched live without a
+restart (~8 s: this output takes two DRM refreshes):
+
+```
+stream-hdr status   # policy, requested state, what gamescope outputs
+stream-hdr on       # HDR always
+stream-hdr off      # SDR always (the default)
+stream-hdr auto     # HDR only for clients that ask for it
+```
+
+SDR is the default because an SDR display on the client (AR glasses on the
+Deck) can only get an HDR stream through a conversion somewhere, and every
+conversion on this path looks washed out. Producing SDR at the source avoids
+it.
+
+Steam owns `GAMESCOPE_DISPLAY_HDR_ENABLED`. It rewrites it from its own HDR
+setting on every display change, so setting it from outside doesn't stick.
+Instead, [`50-stream-hdr.lua`](../host/etc/gamescope/scripts/50-stream-hdr.lua)
+is a gamescope display profile. It claims the output as not HDR-capable unless
+`~gamer/.config/gamescope/hdr` reads `hdr`, and gamescope then ignores
+Steam's flag. gamescope re-matches profiles on every mode nudge, so
+`stream-hdr` writes the file and nudges. `--hdr-enabled` and the HDR env stay
+in the launcher, so HDR works whenever the profile allows it.
+
+The policy is `/etc/gamescope-headless/hdr` (root only; absent means `off`).
+The launcher runs `stream-hdr --boot` before gamescope starts. Sunshine's
+`global_prep_cmd` runs `stream-hdr` on connect and `stream-hdr --default` on
+session end; these only change anything under `auto`. `auto` follows
+`SUNSHINE_CLIENT_HDR`, which is Moonlight's HDR option. The box can't see
+what the Deck is plugged into, so `auto` is only right if that option matches
+the display. If Steam's own HDR setting is off, `on` reports it instead of
+switching. Switching while a client is streaming is untested.
