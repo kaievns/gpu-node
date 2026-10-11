@@ -128,6 +128,8 @@ FILES=(
   usr/local/sbin/kill-running-game.sh
   usr/local/sbin/stream-res
   usr/local/bin/stream-mode
+  usr/local/bin/stream-hdr
+  etc/gamescope/scripts/50-stream-hdr.lua
   etc/tmpfiles.d/gamescope-headless.conf
 
   # Sunshine config (sunshine_state.json deliberately not listed)

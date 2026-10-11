@@ -22,4 +22,6 @@ if [ -r /etc/gamescope-headless/resolution ]; then
   . /etc/gamescope-headless/resolution
   MODE=(-W "$GS_W" -H "$GS_H" -r "$GS_R")
 fi
+# HDR stays available; stream-hdr picks SDR or HDR (SDR by default).
+/usr/local/bin/stream-hdr --boot
 exec gamescope --backend drm --prefer-output HDMI-A-1 "${MODE[@]}" --hdr-enabled -e -- steam -gamepadui > "$LOG" 2>&1

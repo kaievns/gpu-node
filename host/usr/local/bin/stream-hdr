@@ -1,0 +1,165 @@
+#!/usr/bin/env python3
+"""Switch the stream output between SDR and HDR live, SDR unless the policy says otherwise.
+
+  stream-hdr off|on|auto        set the policy (/etc/gamescope-headless/hdr) and apply it
+  stream-hdr status             policy, requested state, what gamescope outputs
+  stream-hdr                    Sunshine do: apply the policy for SUNSHINE_CLIENT_HDR
+  stream-hdr --default          Sunshine undo: apply the policy with no client
+  stream-hdr --boot             write the state file only (launcher, before gamescope)
+  stream-hdr --self-test        check the policy rules
+
+The state file is read by /etc/gamescope/scripts/50-stream-hdr.lua. See docs/streaming.md §8.
+"""
+import os
+import pathlib
+import pwd
+import subprocess
+import sys
+import time
+
+GAME_USER = "gamer"
+POLICIES = ("off", "on", "auto")
+POLICY_FILE = pathlib.Path("/etc/gamescope-headless/hdr")
+HOME = pathlib.Path(pwd.getpwuid(os.getuid()).pw_dir)
+STATE_FILE = HOME / ".config/gamescope/hdr"
+XENV = {**os.environ, "DISPLAY": ":0"}
+SWITCH_TIMEOUT = 20
+
+
+def read_policy(text):
+    word = (text or "").strip()
+    return word if word in POLICIES else "off"
+
+
+def client_hdr(env):
+    return {"true": True, "false": False}.get(env.get("SUNSHINE_CLIENT_HDR", "").lower())
+
+
+def want_hdr(policy, client):
+    return policy == "on" or (policy == "auto" and client is True)
+
+
+def policy():
+    try:
+        return read_policy(POLICY_FILE.read_text())
+    except OSError:
+        return "off"
+
+
+def write_state(hdr):
+    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = STATE_FILE.with_suffix(".tmp")
+    tmp.write_text("hdr\n" if hdr else "sdr\n")
+    tmp.replace(STATE_FILE)
+
+
+def prop(name):
+    out = subprocess.run(["xprop", "-root", name], env=XENV, capture_output=True, text=True, timeout=5).stdout
+    value = out.rsplit("=", 1)[-1].strip()
+    return int(value) if value.isdigit() else None
+
+
+def output_hdr():
+    return prop("GAMESCOPE_HDR_OUTPUT_FEEDBACK") == 1
+
+
+def apply(hdr):
+    write_state(hdr)
+    if prop("GAMESCOPE_DISPLAY_SUPPORTS_HDR") == int(hdr) and output_hdr() == hdr:
+        return "already active"
+    subprocess.run(["xprop", "-root", "-f", "GAMESCOPE_DISPLAY_MODE_NUDGE", "32c",
+                    "-set", "GAMESCOPE_DISPLAY_MODE_NUDGE", "1"], env=XENV, check=True, timeout=5)
+    deadline = time.monotonic() + SWITCH_TIMEOUT
+    while time.monotonic() < deadline:
+        if prop("GAMESCOPE_DISPLAY_SUPPORTS_HDR") == int(hdr) and output_hdr() == hdr:
+            return "switched"
+        time.sleep(0.2)
+    if hdr and prop("GAMESCOPE_DISPLAY_SUPPORTS_HDR") == 1:
+        return "allowed, but Steam's own HDR setting is off"
+    return "NOT confirmed by gamescope"
+
+
+def run(client):
+    pol = policy()
+    hdr = want_hdr(pol, client)
+    print(f"stream-hdr: policy {pol}, client hdr {client} -> {'HDR' if hdr else 'SDR'}, {apply(hdr)}")
+
+
+def status():
+    try:
+        state = STATE_FILE.read_text().strip()
+    except OSError:
+        state = "none (SDR)"
+    print(f"policy:    {policy()}{'' if POLICY_FILE.exists() else ' (default)'}")
+    print(f"requested: {state}")
+    print(f"gamescope: supports HDR {prop('GAMESCOPE_DISPLAY_SUPPORTS_HDR')}, "
+          f"Steam HDR {prop('GAMESCOPE_DISPLAY_HDR_ENABLED')}, outputs {'HDR' if output_hdr() else 'SDR'}")
+
+
+def as_game_user(*args):
+    os.execvp("runuser", ["runuser", "-u", GAME_USER, "--", os.path.abspath(__file__), *args])
+
+
+def as_root(*args):
+    os.execvp("sudo", ["sudo", os.path.abspath(__file__), *args])
+
+
+def set_policy(pol):
+    if pol == "off":
+        POLICY_FILE.unlink(missing_ok=True)
+    else:
+        POLICY_FILE.parent.mkdir(parents=True, exist_ok=True)
+        POLICY_FILE.write_text(pol + "\n")
+    as_game_user("--default")
+
+
+CASES = [
+    (("off", None), False), (("off", True), False), (("off", False), False),
+    (("on", None), True), (("on", True), True), (("on", False), True),
+    (("auto", None), False), (("auto", True), True), (("auto", False), False),
+]
+PARSE = [
+    (read_policy(None), "off"), (read_policy(""), "off"), (read_policy("auto\n"), "auto"),
+    (read_policy("ON"), "off"), (read_policy("hdr"), "off"),
+    (client_hdr({"SUNSHINE_CLIENT_HDR": "true"}), True), (client_hdr({"SUNSHINE_CLIENT_HDR": "false"}), False),
+    (client_hdr({"SUNSHINE_CLIENT_HDR": "TRUE"}), True), (client_hdr({}), None),
+    (client_hdr({"SUNSHINE_CLIENT_HDR": "1"}), None),
+]
+
+
+def self_test():
+    bad = [f"policy {p}, client {c}: want {w}" for (p, c), w in CASES if want_hdr(p, c) != w]
+    bad += [f"parse case {i}: want {w}, got {g}" for i, (g, w) in enumerate(PARSE) if g != w]
+    for b in bad:
+        print("FAIL " + b)
+    total = len(CASES) + len(PARSE)
+    print(f"stream-hdr self-test: {total - len(bad)}/{total} passed")
+    sys.exit(1 if bad else 0)
+
+
+def main(args):
+    if args == ["--self-test"]:
+        self_test()
+    admin = len(args) == 1 and (args[0] in POLICIES or args[0] == "status")
+    if admin and os.geteuid() != 0 and pwd.getpwuid(os.getuid()).pw_name != GAME_USER:
+        as_root(*args)
+    if admin and args[0] in POLICIES:
+        set_policy(args[0])
+    if args == ["status"]:
+        if os.geteuid() == 0:
+            as_game_user("status")
+        status()
+        return
+    if args == ["--boot"]:
+        write_state(want_hdr(policy(), None))
+        return
+    if args not in ([], ["--default"]):
+        sys.exit(__doc__)
+    try:
+        run(None if args else client_hdr(os.environ))
+    except Exception as e:  # never block a stream on an HDR-switch problem
+        print(f"stream-hdr: {type(e).__name__}: {e}; leaving HDR alone")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
