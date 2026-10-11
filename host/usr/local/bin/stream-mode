@@ -2,8 +2,9 @@
 """Switch gamescope's output live to the mode that best matches the Moonlight client.
 
 Run by Sunshine's global_prep_cmd on every connection (SUNSHINE_CLIENT_WIDTH,
-SUNSHINE_CLIENT_HEIGHT, SUNSHINE_CLIENT_FPS). Never fails the connection.
-See docs/streaming.md §6. `stream-mode --self-test` checks the mode picker.
+SUNSHINE_CLIENT_HEIGHT, SUNSHINE_CLIENT_FPS); `--default` (Sunshine undo) returns to
+DEFAULT_MODE. Never fails the connection. See docs/streaming.md §6.
+`stream-mode --self-test` checks the mode picker.
 """
 import os
 import pathlib
@@ -14,6 +15,7 @@ import sys
 import time
 
 DISPLAY_DESC = "Samsung Electric Company SAMSUNG"
+DEFAULT_MODE = (1920, 1200, 120)  # keep in sync with etc/tmpfiles.d/gamer.conf
 HOME = pathlib.Path(pwd.getpwuid(os.getuid()).pw_dir)
 MODE_FILE = HOME / ".config/gamescope/modes.cfg"
 GAMESCOPE_LOG = HOME / ".local/state/gamescope-headless.log"
@@ -66,15 +68,18 @@ def switch(mode):
     return False
 
 
-def main():
+def main(default=False):
     if PIN_FILE.exists():
         print("stream-mode: pinned by stream-res, leaving the mode alone")
         return
-    try:
-        want = tuple(int(os.environ[f"SUNSHINE_CLIENT_{k}"]) for k in ("WIDTH", "HEIGHT", "FPS"))
-    except (KeyError, ValueError):
-        print("stream-mode: no client resolution in the environment, nothing to do")
-        return
+    if default:
+        want = DEFAULT_MODE
+    else:
+        try:
+            want = tuple(int(os.environ[f"SUNSHINE_CLIENT_{k}"]) for k in ("WIDTH", "HEIGHT", "FPS"))
+        except (KeyError, ValueError):
+            print("stream-mode: no client resolution in the environment, nothing to do")
+            return
     listing = subprocess.run(["xprop", "-root", "GAMESCOPE_DISPLAY_MODE_LIST_EXTERNAL"],
                              env=XENV, capture_output=True, text=True, timeout=5).stdout
     modes = parse_modes(listing.split("=", 1)[-1])
@@ -112,9 +117,11 @@ CASES = [
 def self_test():
     modes = parse_modes(SAMPLE)
     bad = [(req, want, pick(modes, *req)) for req, want in CASES if pick(modes, *req) != want]
+    if pick(modes, *DEFAULT_MODE) != DEFAULT_MODE:
+        bad.append((DEFAULT_MODE, DEFAULT_MODE, pick(modes, *DEFAULT_MODE)))
     for req, want, got in bad:
         print(f"FAIL client {req}: want {want}, got {got}")
-    print(f"stream-mode self-test: {len(CASES) - len(bad)}/{len(CASES)} passed")
+    print(f"stream-mode self-test: {len(CASES) + 1 - len(bad)}/{len(CASES) + 1} passed")
     sys.exit(1 if bad else 0)
 
 
@@ -122,6 +129,6 @@ if __name__ == "__main__":
     if sys.argv[1:] == ["--self-test"]:
         self_test()
     try:
-        main()
+        main(default=sys.argv[1:] == ["--default"])
     except Exception as e:  # never block a stream on a mode-switch problem
         print(f"stream-mode: {type(e).__name__}: {e}; leaving the mode alone")
