@@ -226,7 +226,8 @@ Xwayland, reachable from Sunshine's sandbox through the abstract socket.
 Picking rules: the client's exact size if offered, at the lowest refresh at
 or above its FPS (else the highest). Otherwise the largest mode that fits
 inside the client, preferring the same aspect ratio; Sunshine scales the
-rest. `stream-mode --self-test` covers the rules; it never fails a
+rest. 1920x1200 is capped at 90 Hz (`REFRESH_CAP`), so a 120 fps client
+gets 1200p@90. `stream-mode --self-test` covers the rules; it never fails a
 connection, it logs and leaves the mode alone.
 
 This only works because `gamescope-headless.sh` launches without
@@ -234,7 +235,7 @@ This only works because `gamescope-headless.sh` launches without
 file. The mode file
 (`~gamer/.config/gamescope/modes.cfg`, line `Samsung Electric Company
 SAMSUNG:WxH@R`) is reset at boot by `tmpfiles.d` to the default,
-1920x1200@120 (`DEFAULT_MODE` in `stream-mode`; host/80 verify checks the two
+1920x1200@90 (`DEFAULT_MODE` in `stream-mode`; host/80 verify checks the two
 agree). Sunshine's undo command, `stream-mode --default`, returns to it when a
 session ends, so the box idles at 1200p and each client switches on connect.
 
@@ -245,11 +246,11 @@ included), refuses while a client is connected unless `--force`, and
 
 ```
 stream-res status     # pinned or automatic, live mode
-stream-res 1200p      # pin 1920x1200@120
+stream-res 1200p      # pin 1920x1200@90
 stream-res 1080p      # pin 1920x1080@60
 stream-res 2560x1600@60   # pin any WxH[@R] the EDID offers
 stream-res deck       # pin 1280x800@90
-stream-res auto       # unpin: automatic per client, idle at 1920x1200@120
+stream-res auto       # unpin: automatic per client, idle at 1920x1200@90
 ```
 
 1920x1200 isn't in the Deck EDID. `gameland.bin` reuses three slots for it:

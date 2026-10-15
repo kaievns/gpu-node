@@ -93,11 +93,11 @@ if [ -e /etc/gamescope-headless/resolution ]; then
 elif [[ "$last" == *"CLIENT CONNECTED"* ]]; then
   warn "a client is connected; skipping the live switch test"
 else
-  for m in "1280 800 90" "1920 1200 120"; do
+  for m in "1280 800 90 1280 800 90" "1920 1200 120 1920 1200 90"; do
     set -- $m
     out=$(in_unit $SS "SUNSHINE_CLIENT_WIDTH=$1 SUNSHINE_CLIENT_HEIGHT=$2 SUNSHINE_CLIENT_FPS=$3 /usr/local/bin/stream-mode")
-    [[ "$out" == *"($1, $2, $3), switched"* || "$out" == *"($1, $2, $3), already active"* ]] \
-      && ok "live switch to ${1}x${2}@${3}" || fail "live switch to ${1}x${2}@${3}: $out"
+    [[ "$out" == *"-> ($4, $5, $6), switched"* || "$out" == *"-> ($4, $5, $6), already active"* ]] \
+      && ok "live switch: client ${1}x${2}@${3} gets ${4}x${5}@${6}" || fail "live switch for ${1}x${2}@${3}: $out"
   done
 fi
 

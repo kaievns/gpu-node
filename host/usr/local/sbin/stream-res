@@ -16,7 +16,7 @@ auto:    unpin; automatic per client, idle at stream-mode's default
 presets: deck  = 1280x800@90
          1080p = 1920x1080@60
          1440p = 2560x1440@60
-         1200p = 1920x1200@120
+         1200p = 1920x1200@90
 EOF
   exit 1
 }
@@ -35,7 +35,7 @@ case "${1:-}" in
   deck)  W=1280 H=800  R=90 ;;
   1080p) W=1920 H=1080 R=60 ;;
   1440p) W=2560 H=1440 R=60 ;;
-  1200p) W=1920 H=1200 R=120 ;;
+  1200p) W=1920 H=1200 R=90 ;;
   *x*@*) W=${1%%x*} H=${1#*x}; H=${H%@*}; R=${1##*@} ;;
   *x*)   W=${1%%x*} H=${1#*x} R=60 ;;
   *) usage ;;
