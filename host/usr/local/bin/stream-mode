@@ -15,7 +15,8 @@ import sys
 import time
 
 DISPLAY_DESC = "Samsung Electric Company SAMSUNG"
-DEFAULT_MODE = (1920, 1200, 120)  # keep in sync with etc/tmpfiles.d/gamer.conf
+DEFAULT_MODE = (1920, 1200, 90)  # keep in sync with etc/tmpfiles.d/gamer.conf
+REFRESH_CAP = {(1920, 1200): 90}
 HOME = pathlib.Path(pwd.getpwuid(os.getuid()).pw_dir)
 MODE_FILE = HOME / ".config/gamescope/modes.cfg"
 GAMESCOPE_LOG = HOME / ".local/state/gamescope-headless.log"
@@ -34,6 +35,7 @@ def refresh_for(modes, w, h, fps):
 
 
 def pick(modes, w, h, fps):
+    modes = [m for m in modes if m[2] <= REFRESH_CAP.get(m[:2], m[2])]
     sizes = {(mw, mh) for mw, mh, _ in modes}
     if (w, h) in sizes:
         size = (w, h)
@@ -100,13 +102,14 @@ SAMPLE = ("1280x800@90 4096x2160@60 3840x2160@60 2560x1440@120 1920x1200@120 192
 CASES = [
     ((1280, 800, 90), (1280, 800, 90)),
     ((1280, 800, 60), (1280, 800, 60)),
-    ((1920, 1200, 120), (1920, 1200, 120)),
+    ((1920, 1200, 120), (1920, 1200, 90)),
+    ((1920, 1200, 144), (1920, 1200, 90)),
     ((1920, 1200, 90), (1920, 1200, 90)),
     ((1920, 1200, 60), (1920, 1200, 60)),
     ((1920, 1080, 60), (1920, 1080, 60)),
     ((1920, 1080, 90), (1920, 1080, 100)),
     ((1920, 1080, 144), (1920, 1080, 120)),
-    ((2560, 1600, 120), (1920, 1200, 120)),
+    ((2560, 1600, 120), (1920, 1200, 90)),
     ((3440, 1440, 100), (2560, 1440, 120)),
     ((3840, 2160, 60), (3840, 2160, 60)),
     ((800, 480, 60), (640, 480, 60)),
