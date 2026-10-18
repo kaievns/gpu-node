@@ -266,6 +266,7 @@ first.
 | Game | Launch options | Why |
 |---|---|---|
 | Titanfall 2 | `DISABLE_GAMESCOPE_WSI=1 %command%`, Proton Experimental | gamescope 3.16.31's WSI layer crashes the EA app in `vkGetPhysicalDeviceSurfaceFormats2KHR` (null call, `c0000005 in Unix call`). The game then fails with "Failed to get Origin environment setting: The Origin desktop application is not loaded". Same crash on GE-Proton and Valve Proton; fine on 3.16.28. |
+| Pragmata | `%command% /WineDetectionEnabled:False` | The RE Engine detects Wine and greys out Ray Tracing and Path Tracing. The switch turns the check off; ray tracing then runs on GE-Proton11-7 (tested in the hub, walking, no freeze). Set them from the title screen; in-game they're locked. Path tracing also needs DLSS upscaling + Ray Reconstruction. |
 
 Titanfall 2 campaign: **Continue** can crash on some checkpoints (seen mid
 Blood and Rust, inside BT). Restoring the save sets auto-exposure through
