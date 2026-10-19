@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Derive host/usr/lib/firmware/edid/gameland.bin from the vendored steamdeck.bin.
 
-Adds 1920x1200 at 60/90/120 Hz and swaps 2560x1440@120 for @90. See docs/streaming.md §6.
+Adds 1920x1200 at 60/90/120 Hz and 1920x1080@90, and swaps 2560x1440@120 for @90. See docs/streaming.md §6.
 Usage: gen-edid.py [--check]
 """
 import pathlib
@@ -49,6 +49,7 @@ def build():
     assert b[CTA_DUP_DTD:CTA_DUP_DTD + 18] == b[72:90], "CTA DTD is no longer a duplicate"
     b[STD_TIMINGS + 0:STD_TIMINGS + 2] = std_timing(1920, 60)
     b[STD_TIMINGS + 6:STD_TIMINGS + 8] = std_timing(1920, 90)
+    b[STD_TIMINGS + 14:STD_TIMINGS + 16] = std_timing(1920, 90, aspect_bits=0b11)
     # cvt -r 1920 1200 120: 317.00  1920 1968 2000 2080  1200 1203 1209 1271 +hsync -vsync
     b[CTA_DUP_DTD:CTA_DUP_DTD + 18] = dtd(
         317000, 1920, 48, 32, 2080, 1200, 3, 6, 1271,
