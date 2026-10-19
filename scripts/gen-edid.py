@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Derive host/usr/lib/firmware/edid/gameland.bin from the vendored steamdeck.bin.
 
-Adds 1920x1200 at 60/90/120 Hz. See docs/streaming.md §6.
+Adds 1920x1200 at 60/90/120 Hz and swaps 2560x1440@120 for @90. See docs/streaming.md §6.
 Usage: gen-edid.py [--check]
 """
 import pathlib
@@ -11,6 +11,7 @@ EDID_DIR = pathlib.Path(__file__).resolve().parent.parent / "host/usr/lib/firmwa
 SRC, DST = EDID_DIR / "steamdeck.bin", EDID_DIR / "gameland.bin"
 
 STD_TIMINGS = 38
+BASE_DTD_1440 = 72
 CTA_DUP_DTD = 128 + 103
 
 
@@ -52,6 +53,10 @@ def build():
     b[CTA_DUP_DTD:CTA_DUP_DTD + 18] = dtd(
         317000, 1920, 48, 32, 2080, 1200, 3, 6, 1271,
         dtd_size_mm(b, 54), flags=0b00011010)
+    # CVT-RB 2560x1440@90: 367.93  2560 2608 2640 2720  1440 1443 1448 1503 +hsync -vsync
+    b[BASE_DTD_1440:BASE_DTD_1440 + 18] = dtd(
+        367930, 2560, 48, 32, 2720, 1440, 3, 5, 1503,
+        dtd_size_mm(b, BASE_DTD_1440), flags=0b00011010)
     fix_checksums(b)
     return bytes(b)
 

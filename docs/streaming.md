@@ -248,6 +248,7 @@ included), refuses while a client is connected unless `--force`, and
 stream-res status     # pinned or automatic, live mode
 stream-res 1200p      # pin 1920x1200@90
 stream-res 1080p      # pin 1920x1080@60
+stream-res 1440p      # pin 2560x1440@90
 stream-res 2560x1600@60   # pin any WxH[@R] the EDID offers
 stream-res deck       # pin 1280x800@90
 stream-res auto       # unpin: automatic per client, idle at 1920x1080@120
@@ -256,7 +257,9 @@ stream-res auto       # unpin: automatic per client, idle at 1920x1080@120
 1920x1200 isn't in the Deck EDID. `gameland.bin` reuses three slots for it:
 the extension's duplicate 2560x1440@120 DTD becomes 1920x1200@120 (CVT
 reduced blanking, 317 MHz), and the 1152x864@75 and 1280x1024@60 standard
-timings become 1920x1200@60 and @90. To add a mode, edit
+timings become 1920x1200@60 and @90. The base block's 2560x1440@120 DTD is
+swapped for 2560x1440@90 (CVT reduced blanking, 368 MHz), so 1440p only runs
+at 90 Hz. To add a mode, edit
 `scripts/gen-edid.py`, rerun it, test with the DRM debugfs
 `edid_override` before rebooting, and keep the preferred 1280x800@90 DTD
 first.
