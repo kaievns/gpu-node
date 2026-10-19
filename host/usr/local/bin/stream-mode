@@ -15,7 +15,7 @@ import sys
 import time
 
 DISPLAY_DESC = "Samsung Electric Company SAMSUNG"
-DEFAULT_MODE = (1920, 1200, 90)  # keep in sync with etc/tmpfiles.d/gamer.conf
+DEFAULT_MODE = (1920, 1080, 120)  # keep in sync with etc/tmpfiles.d/gamer.conf
 REFRESH_CAP = {(1920, 1200): 90}
 HOME = pathlib.Path(pwd.getpwuid(os.getuid()).pw_dir)
 MODE_FILE = HOME / ".config/gamescope/modes.cfg"
