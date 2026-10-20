@@ -22,7 +22,7 @@ install_file 0755 root:root usr/local/sbin/stream-res /usr/local/sbin/stream-res
 install_file 0755 root:root usr/local/bin/stream-mode /usr/local/bin/stream-mode
 install_file 0755 root:root usr/local/bin/stream-hdr /usr/local/bin/stream-hdr
 install_file 0644 root:root etc/gamescope/scripts/50-stream-hdr.lua /etc/gamescope/scripts/50-stream-hdr.lua
-install_file 0644 root:root etc/tmpfiles.d/gamescope-headless.conf /etc/tmpfiles.d/gamescope-headless.conf
+sudo rm -f /etc/tmpfiles.d/gamescope-headless.conf  # old rule that cleared stream-res pins at boot
 
 # units + drop-ins
 install_file 0644 root:root etc/systemd/system/gamescope-headless.service       /etc/systemd/system/gamescope-headless.service
