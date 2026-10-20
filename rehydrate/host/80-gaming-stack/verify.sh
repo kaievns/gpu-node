@@ -8,6 +8,8 @@ svc sunshine-disconnect-watchdog.service active
 for u in gamescope-headless sunshine sunshine-disconnect-watchdog; do svc "$u.service" enabled; done
 
 [ -x /usr/local/sbin/stream-res ] && ok "stream-res installed" || fail "stream-res missing"
+grep -rqs "gamescope-headless/resolution" /etc/tmpfiles.d /usr/lib/tmpfiles.d /run/tmpfiles.d \
+  && fail "a tmpfiles rule still clears stream-res pins at boot" || ok "stream-res pins survive reboots"
 
 # Sunshine listening on its standard ports
 for p in 47984 47989 47990 48010; do

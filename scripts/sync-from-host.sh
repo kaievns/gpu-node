@@ -130,7 +130,6 @@ FILES=(
   usr/local/bin/stream-mode
   usr/local/bin/stream-hdr
   etc/gamescope/scripts/50-stream-hdr.lua
-  etc/tmpfiles.d/gamescope-headless.conf
 
   # Sunshine config (sunshine_state.json deliberately not listed)
   home/gamer/.config/sunshine/sunshine.conf
