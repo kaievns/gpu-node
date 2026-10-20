@@ -242,7 +242,9 @@ session ends, so the box idles at 1080p and each client switches on connect.
 `stream-res` pins a mode instead, for when automatic isn't wanted. It
 restarts gamescope + Sunshine with explicit flags (~20 s, Steam session
 included), refuses while a client is connected unless `--force`, and
-`stream-mode` stands down while a pin exists:
+`stream-mode` stands down while a pin exists. A pin lasts until the next
+reboot: `tmpfiles.d` deletes it at boot, so the box always boots automatic at
+the default:
 
 ```
 stream-res status     # pinned or automatic, live mode
