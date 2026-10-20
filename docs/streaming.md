@@ -235,9 +235,9 @@ This only works because `gamescope-headless.sh` launches without
 file. The mode file
 (`~gamer/.config/gamescope/modes.cfg`, line `Samsung Electric Company
 SAMSUNG:WxH@R`) is reset at boot by `tmpfiles.d` to the default,
-1920x1080@90 (`DEFAULT_MODE` in `stream-mode`; host/80 verify checks the two
+1920x1200@90 (`DEFAULT_MODE` in `stream-mode`; host/80 verify checks the two
 agree). Sunshine's undo command, `stream-mode --default`, returns to it when a
-session ends, so the box idles at 1080p and each client switches on connect.
+session ends, so the box idles at 1200p and each client switches on connect.
 
 `stream-res` pins a mode instead, for when automatic isn't wanted. It
 restarts gamescope + Sunshine with explicit flags (~20 s, Steam session
@@ -252,7 +252,7 @@ stream-res 1080p      # pin 1920x1080@60
 stream-res 1440p      # pin 2560x1440@90
 stream-res 2560x1600@60   # pin any WxH[@R] the EDID offers
 stream-res deck       # pin 1280x800@90
-stream-res auto       # unpin: automatic per client, idle at 1920x1080@90
+stream-res auto       # unpin: automatic per client, idle at 1920x1200@90
 ```
 
 1920x1200 isn't in the Deck EDID. `gameland.bin` reuses three slots for it:
