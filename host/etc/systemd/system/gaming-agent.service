@@ -7,6 +7,7 @@ Wants=network-online.target
 Type=simple
 User=gaming-agent
 Group=gaming-agent
+SupplementaryGroups=systemd-journal
 ExecStart=/usr/bin/python /opt/gaming-agent/agent.py
 Restart=always
 RestartSec=5

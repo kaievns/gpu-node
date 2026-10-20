@@ -53,7 +53,7 @@ stateDiagram-v2
     Asleep --> Compute: Pending GPU pod — controller sends WOL, then agent POST /mode/compute
     Compute --> Gaming: GPU queue empty for 5 min cooldown — /mode/gaming + mode=gaming taint applied
     Gaming --> Compute: new Pending GPU pod (refused while a stream is live)
-    Gaming --> Asleep: idle 15 min (no stream, GPU under 5%) — idle-check timer suspends
+    Gaming --> Asleep: idle 15 min (no stream, GPU under 30%) — idle-check timer suspends
     Asleep --> Gaming: manual WOL — box wakes into gaming profile
 ```
 

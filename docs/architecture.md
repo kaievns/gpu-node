@@ -180,7 +180,7 @@ sequenceDiagram
 
     loop gpu-idle-check.timer, every 5 min
         H->>A: GET /status
-        alt mode != gaming, or GPU util > 5%
+        alt mode != gaming, a client streaming, or GPU util > 30%
             Note over H: reset idle clock
         else idle ≥ 15 min
             H->>A: POST /sleep

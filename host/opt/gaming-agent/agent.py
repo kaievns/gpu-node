@@ -49,17 +49,19 @@ def current_mode():
     return "compute", cm
 
 def streaming_active():
-    # Sunshine logs "CLIENT CONNECTED" / "CLIENT DISCONNECTED" on stream
-    # start/end. The most recent of these determines current state. If
-    # neither has appeared in the last 30 lines (or sunshine isn't running),
-    # nobody's streaming.
+    # Last CLIENT CONNECTED/DISCONNECTED of the current Sunshine run decides.
+    # Scoped to the invocation (a restart ends any stream) and searched by
+    # journalctl -g, so debug-level log volume can't push it out of view.
     if svc_active("sunshine") != "active":
         return False
+    _, inv, _ = run("/usr/bin/systemctl show -p InvocationID --value sunshine")
+    if not inv:
+        return False
     _, out, _ = run(
-        "/usr/bin/journalctl -u sunshine -n 50 --no-pager 2>&1 "
-        "| /usr/bin/grep -oE 'CLIENT (CONNECTED|DISCONNECTED)' | /usr/bin/tail -1"
+        f"/usr/bin/journalctl _SYSTEMD_INVOCATION_ID={inv} -o cat --no-pager "
+        "-g 'CLIENT (CONNECTED|DISCONNECTED)' -n 1"
     )
-    return out == "CLIENT CONNECTED"
+    return out.endswith("CLIENT CONNECTED")
 
 @app.get("/status")
 def status(_=Depends(require_token)):
