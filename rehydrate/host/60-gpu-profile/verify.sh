@@ -29,11 +29,14 @@ svc gpu-gaming.service  enabled
 # After boot: gaming mode should be active (gpu-gaming flips after gpu-profile)
 read -r pl plmax mode < <(nvidia-smi --query-gpu=power.limit,power.max_limit,compute_mode --format=csv,noheader,nounits 2>/dev/null | tr -d ',')
 [ "${pl:-x}" = "${plmax:-y}" ] && [ "${mode:-}" = "Default" ] \
-  && ok "GPU in gaming mode (PL=${pl}W = card max, Default; $(gpu-offsets 2>/dev/null))" \
+  && ok "GPU in gaming mode (PL=${pl}W = card max, Default)" \
   || warn "GPU not yet in gaming mode (PL=${pl:-?}/${plmax:-?}, ${mode:-?}) — run after gpu-gaming.service has fired"
+offsets=$(gpu-offsets 2>/dev/null || true)
+[ "$offsets" = "core=200 mem=1500" ] && ok "VF offsets applied ($offsets)" || fail "VF offsets are '$offsets', want core=200 mem=1500"
 
 # Persistent telemetry (v2.3+) for Xid forensics
 svc gpu-telemetry.service enabled
-[ -s /var/log/gpu-telemetry.log ] \
-  && ok "gpu-telemetry log present ($(wc -l < /var/log/gpu-telemetry.log) lines)" \
-  || warn "gpu-telemetry.log empty — service may not have started yet"
+svc gpu-telemetry.service active
+[ $(($(date +%s) - $(stat -c %Y /var/log/gpu-telemetry.log))) -lt 60 ] \
+  && ok "gpu-telemetry log updated in the last minute" \
+  || fail "gpu-telemetry log is stale"
