@@ -33,6 +33,9 @@ install_file 0644 root:root etc/systemd/system/sunshine-disconnect-watchdog.serv
 [ -d "$PAYLOAD_DIR/etc/systemd/system/sunshine.service.d" ] \
   && install_dir etc/systemd/system/sunshine.service.d /etc/systemd/system/sunshine.service.d
 install_dir etc/systemd/system/user-1100.slice.d /etc/systemd/system/user-1100.slice.d
+install_file 0644 root:root etc/nftables.d/game-fence.nft /etc/nftables.d/game-fence.nft
+install_file 0644 root:root etc/systemd/system/game-fence-nft.service /etc/systemd/system/game-fence-nft.service
+install_file 0644 root:root etc/polkit-1/rules.d/50-game-fence.rules /etc/polkit-1/rules.d/50-game-fence.rules
 
 # udev rule — gives /dev/uinput perms to Sunshine for virtual gamepad
 install_file 0644 root:root etc/udev/rules.d/99-uinput.rules /etc/udev/rules.d/99-uinput.rules
@@ -48,7 +51,7 @@ sudo install -m 0644 -o "$GAME_USER" -g "$GAME_USER" \
   "$PAYLOAD_DIR/home/gamer/.config/sunshine/apps.json"     "/home/$GAME_USER/.config/sunshine/apps.json"
 
 sudo systemctl daemon-reload
-sudo systemctl enable gamescope-headless.service sunshine.service sunshine-disconnect-watchdog.service
+sudo systemctl enable game-fence-nft.service gamescope-headless.service sunshine.service sunshine-disconnect-watchdog.service
 sudo systemctl start gamescope-headless.service sunshine-disconnect-watchdog.service
 
 warn "Sunshine pairing state NOT restored (sunshine_state.json is never in the repo) — pair the deck fresh at https://172.16.1.220:47990"

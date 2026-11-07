@@ -1,0 +1,8 @@
+// Game sandbox: see docs/architecture.md "Game sandbox".
+polkit.addRule(function(action, subject) {
+    if (subject.user == "gamer" &&
+        (action.id.indexOf("org.freedesktop.NetworkManager.") == 0 ||
+         action.id == "org.freedesktop.login1.chvt")) {
+        return polkit.Result.NO;
+    }
+});

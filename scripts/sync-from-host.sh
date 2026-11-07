@@ -78,6 +78,9 @@ FILES=(
 
   # nftables QoS for Sunshine UDP egress (DSCP AF41)
   etc/nftables.d/sunshine-qos.nft
+  etc/nftables.d/game-fence.nft
+  etc/systemd/system/game-fence-nft.service
+  etc/polkit-1/rules.d/50-game-fence.rules
   etc/resolv.conf
   etc/NetworkManager/conf.d/50-static-resolv.conf
 

@@ -1,4 +1,8 @@
 #!/bin/bash
+case "$(cat /proc/self/cgroup)" in
+  */user-1100.slice/*) ;;
+  *) echo "gamescope-headless: refusing to start outside user-1100.slice (no IP fence)" >&2; exit 1 ;;
+esac
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 export __GLX_VENDOR_LIBRARY_NAME=nvidia
 export GBM_BACKEND=nvidia-drm
