@@ -355,6 +355,8 @@ session can't leave Steam unfiltered. A polkit
 [rule](../host/etc/polkit-1/rules.d/50-game-fence.rules) denies `gamer` all
 NetworkManager actions and VT switching: a NetworkManager TUN profile would
 send packets with no socket, which the IP filter can't see.
+`gamescope-headless` requires `game-fence-nft`, so restarting that unit bounces
+the gaming stack: use `systemctl reload` after editing the rules.
 
 Accepted residual risk:
 
