@@ -1,9 +1,9 @@
 # Streaming a headless NVIDIA box to a Steam Deck
 
-How Gameland streams games: a headless Arch box (RTX 3080 10GB, nvidia-open
-595.71.05, no monitor, no dummy plug) running gamescope on bare DRM with a
+How Gameland streams games: a headless Arch box (RTX 5080, nvidia-open
+615.71.09, no monitor, no dummy plug) running gamescope on bare DRM with a
 kernel-injected Steam Deck EDID, captured by Sunshine over KMS, decoded by
-Moonlight on a Steam Deck OLED — 1280×800@90, HEVC 10-bit, HDR10 on request
+Moonlight on a Steam Deck OLED — AV1 10-bit, HDR10 on request
 (SDR by default, §8).
 
 It did not start out this way. This doc is the story of why each piece is
@@ -20,7 +20,7 @@ flowchart LR
         GS --> STEAM["steam -gamepadui"]
     end
     subgraph sunshine ["Sunshine"]
-        GS -->|KMS capture| ENC["NVENC HEVC Main10<br/>Rec.2020 + ST2084"]
+        GS -->|KMS capture| ENC["NVENC AV1 10-bit<br/>Rec.2020 + ST2084"]
         PW["PipeWire BinauralBus<br/>(see audio.md)"] --> OPUS["Opus"]
     end
     ENC -->|"UDP, DSCP AF41"| DECK["Moonlight on<br/>Steam Deck OLED"]
@@ -126,7 +126,7 @@ narrower than the internet suggests:
    ```
 
 4. **Sunshine captures over KMS** with HDR intact: Rec.2020 primaries +
-   SMPTE ST2084 (PQ) transfer, encoded as HEVC Main10 by NVENC. The Deck
+   SMPTE ST2084 (PQ) transfer, encoded as 10-bit AV1 by NVENC. The Deck
    OLED displays real HDR at the other end.
 
 Historical note: gamescope's DRM backend originally SIGSEGV'd on this stack
@@ -159,9 +159,8 @@ under a live Sunshine.
 Things that are not bugs and not fixable; documented so nobody chases them
 again:
 
-- **No AV1.** GA102/Ampere has no AV1 encoder; `av1_nvenc` reports "No
-  capable devices found". Moonlight's "host doesn't support AV1" message is
-  expected and permanent on this GPU. HEVC 8/10-bit works fine.
+- **`av1_nvenc: YUV 4:4:4 not supported` at Sunshine start.** That's the
+  encoder probe, not a failure: AV1 is still found and used in 4:2:0.
 - **P2 pstate under any CUDA/NVENC context, by design.** Consumer GeForce
   drops to P2 whenever a CUDA or NVENC context exists; memory clock is
   capped at 9251 MHz (P0 would be 9501). `nvidia-smi -lmc` is
@@ -181,7 +180,7 @@ again:
 | Display | HDMI-A-1, 1280×800@90, HDR10, kernel-injected Deck EDID | [`host/boot/loader/entries/arch.conf`](../host/boot/loader/entries/arch.conf) |
 | Compositor | gamescope DRM backend, `--hdr-enabled` (SDR unless `stream-hdr` allows HDR, §8), launches `steam -gamepadui` | [`host/usr/local/bin/gamescope-headless.sh`](../host/usr/local/bin/gamescope-headless.sh) |
 | Session unit | tty8 login session via `PAMName=login`, caps dropped (Steam bwrap) | [`host/etc/systemd/system/gamescope-headless.service`](../host/etc/systemd/system/gamescope-headless.service) + [drop-ins](../host/etc/systemd/system/gamescope-headless.service.d/) |
-| Capture/encode | Sunshine `capture = kms`, `encoder = nvenc`, HEVC Main10 HDR | [`host/home/gamer/.config/sunshine/sunshine.conf`](../host/home/gamer/.config/sunshine/sunshine.conf) |
+| Capture/encode | Sunshine `capture = kms`, `encoder = nvenc`, AV1 10-bit HDR (client picks the codec) | [`host/home/gamer/.config/sunshine/sunshine.conf`](../host/home/gamer/.config/sunshine/sunshine.conf) |
 | Bitrate | no server cap (client sets it), `fec_percentage = 20` | same |
 | Input | `gamepad = xone` (Xbox One pad emulation — `ds5` was trialled for gyro but retired); keyboard/mouse disabled | same |
 | Audio | Sunshine captures `BinauralBus` (host-side binaural; Moonlight client set to STEREO) | [audio.md](audio.md) |
