@@ -71,6 +71,13 @@ was tested and exonerated — OC, P-states, PowerMizer registry knobs, bitrate
 community-correct fix is GPU-side capture: **Sunshine + Moonlight**. That is
 why Sunshine exists on this box.
 
+Remote Play also can't carry HDR from this host. Under gamescope, Steam
+captures gamescope's PipeWire node, which offers only 8-bit BGRx and NV12, and
+gamescope composites that buffer to gamma 2.2 (`paint_pipewire`, 3.16.31).
+Sunshine's KMS capture delivers 10-bit Rec.2020 PQ. AV1 adds nothing either:
+Moonlight already negotiates it, and Steam's AV1 needs the experimental
+SteamRT3 client. This comes from the live node and source, not a test session.
+
 ## 2. The headless EDID problem on nvidia-open
 
 Sunshine needs something to capture, and modern Sunshine on this stack means
