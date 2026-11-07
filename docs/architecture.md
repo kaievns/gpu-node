@@ -343,12 +343,13 @@ doesn't apply: gamescope's tty8 session is never the active VT.
 
 | Unit | Filesystem | Network |
 |---|---|---|
-| `gamescope-headless` (Steam and every game) | system read-only, other homes hidden, private `/tmp`, k3s and agent paths inaccessible, no privilege gain | internet only: private, CGNAT and link-local ranges denied (LAN, router, pod and service networks). DNS comes from a unit-only [`resolv.conf`](../host/etc/gaming-fence/resolv.conf) so the router can stay blocked. |
+| `gamescope-headless` (Steam and every game) | system read-only, other homes hidden, private `/tmp`, k3s and agent paths inaccessible, no privilege gain | internet only: private, CGNAT, link-local, multicast and broadcast denied (LAN, router, pod and service networks). The rule sits on `user-1100.slice`, because `PAMName=login` moves Steam into a session scope outside the unit's cgroup. DNS comes from a unit-only [`resolv.conf`](../host/etc/gaming-fence/resolv.conf) so the router can stay blocked. NetworkManager leaves `/etc/resolv.conf` alone (`rc-manager=unmanaged`): a rename over it detaches that bind mount from the unit's namespace. |
 | `sunshine` | same fence | localhost and the client subnets `172.16.1.0/24`, `172.20.1.0/24`; no internet |
 | `sunshine-disconnect-watchdog` | reads Sunshine's own log, writes only the game-kill log | none |
 
-The rules live in the `40-fence.conf` drop-ins. `rehydrate/host/80`
-verify probes them from inside each unit's cgroup and mount namespace.
+The rules live in the `40-fence.conf` drop-ins. `rehydrate/host/80` verify
+probes them from the cgroup and mount namespace each unit's main process
+really runs in, and fails if any `gamer` process sits outside a fenced cgroup.
 
 Accepted residual risk:
 

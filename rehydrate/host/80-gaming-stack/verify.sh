@@ -23,15 +23,17 @@ sudo journalctl -u sunshine --since "5 min ago" --no-pager 2>/dev/null \
   || warn "no recent NVENC init log (Sunshine may need a client connect to log encoder)"
 
 # ── Game sandbox ─────────────────────────────────────────────────────────────
-# in_unit <unit> <script>: run <script> as gamer inside <unit>'s cgroup (IP
-# filter) and mount namespace (filesystem fence).
+# in_unit <unit> <script>: run <script> as gamer in the cgroup (IP filter) and
+# mount namespace (filesystem fence) <unit>'s main process really runs in. For
+# gamescope that's a PAM session scope, not the unit's own cgroup.
 in_unit() {
-  local unit="$1" script="$2" pid
+  local unit="$1" script="$2" pid cg
   pid=$(systemctl show -p MainPID --value "$unit")
   [ "${pid:-0}" -gt 0 ] || fail "$unit has no main process"
-  sudo bash -c 'echo $$ > "/sys/fs/cgroup/system.slice/$1/cgroup.procs" &&
+  cg=$(sudo sed 's/^0:://' "/proc/$pid/cgroup")
+  sudo bash -c 'echo $$ > "/sys/fs/cgroup$1/cgroup.procs" &&
     exec nsenter -t "$2" -m -- setpriv --reuid=gamer --regid=gamer --init-groups -- bash -c "$3"' \
-    _ "$unit" "$pid" "$script"
+    _ "$cg" "$pid" "$script"
 }
 # The IP filter drops silently, so "blocked" = answers from the host, times
 # out from inside the unit.
@@ -50,6 +52,9 @@ wd=$(systemctl show -p MainPID --value sunshine-disconnect-watchdog.service)
 [ "$(ps -o user= -p "$wd" | xargs)" = gamer ] && ok "watchdog runs as gamer" || fail "watchdog not running as gamer"
 steam_pid=$(pgrep -u gamer -x steam | head -1)
 ps -o supgrp= -p "$steam_pid" | grep -qw wheel && fail "steam has wheel" || ok "steam has no wheel group"
+strays=$(for p in $(pgrep -u gamer); do sudo cat "/proc/$p/cgroup" 2>/dev/null; done | sed 's/^0:://' | sort -u \
+  | grep -vE '^/user\.slice/user-1100\.slice/|^/system\.slice/(sunshine|sunshine-disconnect-watchdog)\.service$' || true)
+[ -z "$strays" ] && ok "every gamer process runs in a fenced cgroup" || fail "gamer processes outside the fence: $strays"
 
 pads=$(for d in /sys/class/input/event*; do udevadm info -q property "$d" | grep -qx ID_INPUT_JOYSTICK=1 && echo "/dev/input/${d##*/}"; done; true)
 if [ -z "$pads" ]; then
@@ -66,12 +71,23 @@ in_unit $GS 'test -r /var/lib/rancher' && fail "games can read /var/lib/rancher"
 in_unit $GS 'touch /usr/.fence-probe' 2>/dev/null && fail "games can write /usr" || ok "system read-only to games"
 in_unit $GS 'exec 3<>/dev/uinput' && ok "Steam can create virtual controllers (uinput)" || fail "Steam cannot open /dev/uinput"
 in_unit $GS 'findmnt -no OPTIONS /proc' | grep -q hidepid && fail "games' /proc has hidepid (breaks EasyAntiCheat)" || ok "games' /proc has no hidepid (EasyAntiCheat needs it)"
-in_unit $GS 'grep -q "^nameserver 1.1.1.1" /etc/resolv.conf' && ok "games use fenced DNS" || fail "games use host DNS"
+sudo nmcli general reload dns-rc
+in_unit $GS 'cat /etc/resolv.conf' | cmp -s - /etc/gaming-fence/resolv.conf \
+  && ok "games use fenced DNS, even after a NetworkManager DNS update" || fail "games lost the fenced resolv.conf"
 in_unit $GS 'getent hosts api.steampowered.com >/dev/null' && ok "games resolve internet names" || fail "games cannot resolve names"
 reachable $GS 1.1.1.1 443      && ok "games reach the internet"          || fail "games cannot reach the internet"
 blocked   $GS 172.16.1.254 80  && ok "games blocked from LAN router"     || fail "games can reach the LAN router"
 blocked   $GS 172.16.1.220 8080 && ok "games blocked from gaming-agent"  || fail "games can reach the gaming-agent"
 blocked   $GS 10.43.0.1 443    && ok "games blocked from k8s API service" || fail "games can reach the k8s API service"
+bcast=$(in_unit $GS "python3 -c 'import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+try:
+    s.sendto(b\"x\", (\"255.255.255.255\", 9))
+    print(\"SENT\")
+except PermissionError:
+    print(\"DENIED\")'")
+[ "$bcast" = DENIED ] && ok "games blocked from LAN broadcast" || fail "games can broadcast on the LAN ($bcast)"
 
 SS=sunshine.service
 [ "$(in_unit $SS 'ls -A /home')" = gamer ] && ok "sunshine sees only /home/gamer" || fail "sunshine can see other homes"

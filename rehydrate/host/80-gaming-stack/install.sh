@@ -32,6 +32,7 @@ install_file 0644 root:root etc/systemd/system/sunshine-disconnect-watchdog.serv
   && install_dir etc/systemd/system/gamescope-headless.service.d /etc/systemd/system/gamescope-headless.service.d
 [ -d "$PAYLOAD_DIR/etc/systemd/system/sunshine.service.d" ] \
   && install_dir etc/systemd/system/sunshine.service.d /etc/systemd/system/sunshine.service.d
+install_dir etc/systemd/system/user-1100.slice.d /etc/systemd/system/user-1100.slice.d
 
 # udev rule — gives /dev/uinput perms to Sunshine for virtual gamepad
 install_file 0644 root:root etc/udev/rules.d/99-uinput.rules /etc/udev/rules.d/99-uinput.rules
