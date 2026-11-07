@@ -4,8 +4,7 @@
 set -euo pipefail
 . "$(dirname "$0")/../../lib/common.sh"
 
-# coolercontrold is AUR; should be installed by host/10. Confirm.
-pacman -Qq coolercontrold >/dev/null 2>&1 || ensure_aur_pkg coolercontrold
+ensure_pkg coolercontrold
 
 # Need acpi_enforce_resources=lax for safe nct6775 PWM writes on ASUS B550.
 # Already in our captured boot/loader/entries/arch.conf (host/20 installs it).

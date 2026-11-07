@@ -9,11 +9,9 @@ ensure_pkg nvidia-open nvidia-container-toolkit
 # persistence mode (keeps driver loaded across CUDA context cycles)
 sudo systemctl enable --now nvidia-persistenced.service
 
-# Regenerate the CDI spec (CDI = container device interface; nvidia-ctk
-# emits /etc/cdi/nvidia.yaml so containerd/runtime can hand the GPU to
-# pods without device-plugin allocation when NVIDIA_VISIBLE_DEVICES=all)
-if command -v nvidia-ctk >/dev/null; then
-  sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml >/dev/null
-fi
+# CDI spec (container device interface): nvidia-cdi-refresh writes
+# /var/run/cdi/nvidia.yaml at every boot, so containerd/runtime can hand the
+# GPU to pods without device-plugin allocation when NVIDIA_VISIBLE_DEVICES=all
+sudo systemctl start nvidia-cdi-refresh.service
 
 ok "nvidia configured"
