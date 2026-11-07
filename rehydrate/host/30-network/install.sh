@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # host/30-network — nftables sunshine-qos (DSCP AF41 on UDP 47998-48010 egress)
-# + WOL ethtool persistence on enp7s0.
+# + static /etc/resolv.conf + WOL ethtool persistence on enp7s0.
 set -euo pipefail
 . "$(dirname "$0")/../../lib/common.sh"
 
@@ -10,6 +10,10 @@ install_file 0644 root:root etc/nftables.d/sunshine-qos.nft       /etc/nftables.
 install_file 0644 root:root etc/systemd/system/sunshine-qos.service /etc/systemd/system/sunshine-qos.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now sunshine-qos.service
+
+install_file 0644 root:root etc/NetworkManager/conf.d/50-static-resolv.conf /etc/NetworkManager/conf.d/50-static-resolv.conf
+sudo nmcli general reload conf
+install_file 0644 root:root etc/resolv.conf /etc/resolv.conf
 
 # WOL: arm magic-packet wake on the NIC. Persisted via NetworkManager dispatcher
 # is the cleanest, but a one-shot ethtool plus the BIOS setting (ErP=disabled +

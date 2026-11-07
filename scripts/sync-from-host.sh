@@ -78,6 +78,8 @@ FILES=(
 
   # nftables QoS for Sunshine UDP egress (DSCP AF41)
   etc/nftables.d/sunshine-qos.nft
+  etc/resolv.conf
+  etc/NetworkManager/conf.d/50-static-resolv.conf
 
   # audio: PipeWire filter-chain configs (HRTF binaries deliberately absent)
   etc/pipewire/pipewire.conf.d/90-hrtf-surround.conf
@@ -146,6 +148,7 @@ FILES=(
 DROPIN_DIRS=(
   etc/systemd/system/gamescope-headless.service.d
   etc/systemd/system/sunshine.service.d
+  etc/systemd/system/user-1100.slice.d
 )
 
 echo "═══ [1/4] sync ${#FILES[@]} files from $HOST → host/ ═══"

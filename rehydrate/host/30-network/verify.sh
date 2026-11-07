@@ -7,6 +7,10 @@ nft_table_exists inet sunshine_qos
 sudo nft list table inet sunshine_qos 2>/dev/null | grep -q 'dscp set af41' \
   && ok "DSCP AF41 rule present" || fail "DSCP rule missing from sunshine_qos"
 
+sudo nmcli general reload dns-rc
+cmp -s "$PAYLOAD_DIR/etc/resolv.conf" /etc/resolv.conf \
+  && ok "NetworkManager leaves /etc/resolv.conf alone" || fail "/etc/resolv.conf differs from the payload (NetworkManager rewrote it?)"
+
 iface=$(ip -o -4 route show default | awk '{print $5; exit}')
 sudo ethtool "$iface" 2>/dev/null | grep -q 'Wake-on: g' \
   && ok "WOL armed on $iface" || warn "WOL not armed on $iface (BIOS-side check)"
