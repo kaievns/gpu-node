@@ -5,6 +5,7 @@ After=network.target
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/nft -f /etc/nftables.d/game-fence.nft
+ExecReload=/usr/bin/nft -f /etc/nftables.d/game-fence.nft
 ExecStop=/usr/bin/nft delete table inet game_fence
 RemainAfterExit=yes
 
