@@ -188,7 +188,7 @@ again:
 | Compositor | gamescope DRM backend, `--hdr-enabled` (SDR unless `stream-hdr` allows HDR, §8), launches `steam -gamepadui` | [`host/usr/local/bin/gamescope-headless.sh`](../host/usr/local/bin/gamescope-headless.sh) |
 | Session unit | tty8 login session via `PAMName=login`, caps dropped (Steam bwrap) | [`host/etc/systemd/system/gamescope-headless.service`](../host/etc/systemd/system/gamescope-headless.service) + [drop-ins](../host/etc/systemd/system/gamescope-headless.service.d/) |
 | Capture/encode | Sunshine `capture = kms`, `encoder = nvenc`, AV1 10-bit HDR (client picks the codec) | [`host/home/gamer/.config/sunshine/sunshine.conf`](../host/home/gamer/.config/sunshine/sunshine.conf) |
-| Bitrate | no server cap (client sets it), `fec_percentage = 20` | same |
+| Bitrate | no server cap (client sets it), `fec_percentage = 5` | same |
 | Input | `gamepad = xone` (Xbox One pad emulation — `ds5` was trialled for gyro but retired); keyboard/mouse disabled | same |
 | Audio | Sunshine captures `BinauralBus` (host-side binaural; Moonlight client set to STEREO) | [audio.md](audio.md) |
 | QoS | DSCP AF41 on Sunshine UDP egress (47998–48010) | [`host/etc/nftables.d/sunshine-qos.nft`](../host/etc/nftables.d/sunshine-qos.nft) |
