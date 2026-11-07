@@ -1,0 +1,11 @@
+#!/usr/sbin/nft -f
+# Game sandbox: see docs/architecture.md "Game sandbox".
+table inet game_fence
+delete table inet game_fence
+table inet game_fence {
+    chain output {
+        type filter hook output priority 0 ; policy accept ;
+        meta skuid 1100 udp dport 8472 counter drop
+        meta skuid 1100 oif lo tcp dport { 22, 6444, 8080, 9100, 10010, 10248, 10249, 10250, 10256, 11987, 11988 } counter reject with tcp reset
+    }
+}

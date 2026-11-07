@@ -350,13 +350,27 @@ doesn't apply: gamescope's tty8 session is never the active VT.
 The rules live in the `40-fence.conf` drop-ins. `rehydrate/host/80` verify
 probes them from the cgroup and mount namespace each unit's main process
 really runs in, and fails if any `gamer` process sits outside a fenced cgroup.
+`gamescope-headless.sh` refuses to start outside the slice, so a failed PAM
+session can't leave Steam unfiltered. A polkit
+[rule](../host/etc/polkit-1/rules.d/50-game-fence.rules) denies `gamer` all
+NetworkManager actions and VT switching: a NetworkManager TUN profile would
+send packets with no socket, which the IP filter can't see.
 
 Accepted residual risk:
 
 - **Loopback stays open to games**, because Steam talks to itself over it.
-  Every local listener is authenticated or read-only: k3s (client certs),
-  containerd streaming (per-session URLs), gaming-agent (token),
-  CoolerControl (password), node_exporter and kube metrics (read-only).
+  [`game-fence.nft`](../host/etc/nftables.d/game-fence.nft) still drops uid
+  1100 on UDP 8472, where flannel would decapsulate a crafted VXLAN frame with
+  no socket for the IP filter to see, and rejects the k3s, kubelet, containerd,
+  agent, CoolerControl, node_exporter and sshd ports. Any other local service
+  is reachable. So is sshd's `/run/ssh-unix-local/socket`, behind key login.
+- **Games share a uid and home with Sunshine.** A game can edit `sunshine.conf`,
+  `apps.json` and `~/.steam/steam/steam.sh`, which Sunshine runs, and Sunshine
+  has LAN access and `CAP_SYS_ADMIN`. Its web UI needs those files writable.
+- **The `gamer` user manager runs outside the mount fence.** `user@1100` has the
+  host's mount namespace and no `NoNewPrivs`, and a game can reach its socket in
+  `/run/user/1100`, so a transient user unit would escape the filesystem fence.
+  The slice's IP filter still applies there, and `/home/kai` stays 0700.
 - **Games can list other users' processes.** Easy Anti-Cheat fails with
   "Launch Error: 261" under `hidepid`, so the fence leaves `/proc` alone.
   Process names and command lines are visible; their memory, environment

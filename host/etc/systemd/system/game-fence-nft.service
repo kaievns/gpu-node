@@ -1,0 +1,12 @@
+[Unit]
+Description=Game sandbox: keep uid 1100 off VXLAN and the cluster and admin ports on loopback
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/nft -f /etc/nftables.d/game-fence.nft
+ExecStop=/usr/bin/nft delete table inet game_fence
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

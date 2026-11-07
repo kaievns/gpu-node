@@ -16,11 +16,10 @@ for p in 47984 47989 47990 48010; do
   ss -tlnp 2>/dev/null | grep -q ":$p " && ok "Sunshine listening on $p" || fail "port $p not listening"
 done
 
-# HDR + HEVC NVENC confirmed
-sudo journalctl -u sunshine --since "5 min ago" --no-pager 2>/dev/null \
-  | grep -q 'Found HEVC encoder: hevc_nvenc' \
-  && ok "HEVC nvenc encoder ready" \
-  || warn "no recent NVENC init log (Sunshine may need a client connect to log encoder)"
+# Streams are AV1. A failed start leaves the unit active, so read this run's log.
+sunshine_log=$(sudo journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show -p InvocationID --value sunshine)" -o cat --no-pager)
+[[ "$sunshine_log" == *"Found AV1 encoder: av1_nvenc"* ]] && ok "Sunshine found the AV1 NVENC encoder" || fail "no AV1 NVENC encoder in this Sunshine run"
+[[ "$sunshine_log" != *"Fatal:"* ]] && ok "Sunshine started without a fatal error" || fail "Sunshine logged a fatal error at startup"
 
 # ── Game sandbox ─────────────────────────────────────────────────────────────
 # in_unit <unit> <script>: run <script> as gamer in the cgroup (IP filter) and
@@ -37,8 +36,28 @@ in_unit() {
 }
 # The IP filter drops silently, so "blocked" = answers from the host, times
 # out from inside the unit.
-tcp() { echo "timeout 4 bash -c 'exec 3<>/dev/tcp/$1/$2' 2>/dev/null && echo OPEN"; }
-reachable() { [ "$(in_unit "$1" "$(tcp "$2" "$3")")" = OPEN ]; }
+tcp() { echo "timeout 4 bash -c 'exec 3<>/dev/tcp/$1/$2' 2>/dev/null && echo OPEN || echo CLOSED"; }
+reachable() {
+  local r
+  r=$(in_unit "$1" "$(tcp "$2" "$3")") || true
+  case "$r" in
+    OPEN) return 0 ;;
+    CLOSED) return 1 ;;
+    *) fail "probe from $1 to $2:$3 did not run: $r" ;;
+  esac
+}
+# denied <unit> <test>: <test> ran in the unit and failed. A broken probe isn't a denial.
+denied() { [ "$(in_unit "$1" "$2 && echo ALLOWED || echo DENIED")" = DENIED ]; }
+udp_send() {
+  in_unit "$1" "python3 -c 'import socket, sys
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+try:
+    s.sendto(b\"x\", (sys.argv[1], int(sys.argv[2])))
+    print(\"SENT\")
+except PermissionError:
+    print(\"DENIED\")' $2 $3"
+}
 blocked() {
   timeout 4 bash -c "exec 3<>/dev/tcp/$2/$3" 2>/dev/null || fail "probe target $2:$3 unreachable even from the host"
   ! reachable "$1" "$2" "$3"
@@ -66,9 +85,9 @@ fi
 
 GS=gamescope-headless.service
 [ "$(in_unit $GS 'ls -A /home')" = gamer ] && ok "games see only /home/gamer" || fail "games can see other homes"
-in_unit $GS 'test -r /etc/rancher/k3s/config.yaml' && fail "games can read k3s config" || ok "k3s config hidden from games"
-in_unit $GS 'test -r /var/lib/rancher' && fail "games can read /var/lib/rancher" || ok "k3s state hidden from games"
-in_unit $GS 'touch /usr/.fence-probe' 2>/dev/null && fail "games can write /usr" || ok "system read-only to games"
+denied $GS 'test -r /etc/rancher/k3s/config.yaml' && ok "k3s config hidden from games" || fail "games can read k3s config"
+denied $GS 'test -r /var/lib/rancher' && ok "k3s state hidden from games" || fail "games can read /var/lib/rancher"
+in_unit $GS 'findmnt -no OPTIONS -T /usr' | grep -qE '(^|,)ro(,|$)' && ok "system read-only to games" || fail "games' /usr is not mounted read-only"
 in_unit $GS 'exec 3<>/dev/uinput' && ok "Steam can create virtual controllers (uinput)" || fail "Steam cannot open /dev/uinput"
 in_unit $GS 'findmnt -no OPTIONS /proc' | grep -q hidepid && fail "games' /proc has hidepid (breaks EasyAntiCheat)" || ok "games' /proc has no hidepid (EasyAntiCheat needs it)"
 sudo nmcli general reload dns-rc
@@ -79,15 +98,19 @@ reachable $GS 1.1.1.1 443      && ok "games reach the internet"          || fail
 blocked   $GS 172.16.1.254 80  && ok "games blocked from LAN router"     || fail "games can reach the LAN router"
 blocked   $GS 172.16.1.220 8080 && ok "games blocked from gaming-agent"  || fail "games can reach the gaming-agent"
 blocked   $GS 10.43.0.1 443    && ok "games blocked from k8s API service" || fail "games can reach the k8s API service"
-bcast=$(in_unit $GS "python3 -c 'import socket
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-try:
-    s.sendto(b\"x\", (\"255.255.255.255\", 9))
-    print(\"SENT\")
-except PermissionError:
-    print(\"DENIED\")'")
-[ "$bcast" = DENIED ] && ok "games blocked from LAN broadcast" || fail "games can broadcast on the LAN ($bcast)"
+[ "$(udp_send $GS 255.255.255.255 9)" = DENIED ] && ok "games blocked from LAN broadcast" || fail "games can broadcast on the LAN"
+[ "$(udp_send $GS 127.0.0.1 8472)" = DENIED ] && ok "games blocked from the VXLAN port" || fail "games can reach VXLAN on loopback"
+for p in 6444 8080 10250; do
+  blocked $GS 127.0.0.1 $p && ok "games blocked from loopback port $p" || fail "games can reach loopback port $p"
+done
+steam_port=$(sudo ss -ltnpH "( src 127.0.0.1 )" | awk '/"steam"/{sub(/.*:/, "", $4); print $4; exit}')
+reachable $GS 127.0.0.1 "$steam_port" && ok "Steam still reaches its own loopback port" || fail "Steam's loopback port $steam_port is blocked"
+for a in org.freedesktop.NetworkManager.network-control org.freedesktop.NetworkManager.settings.modify.own org.freedesktop.login1.chvt; do
+  rc=0; sudo pkcheck --action-id "$a" --process "$steam_pid" >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 1 ] && ok "polkit denies games $a" || fail "polkit answered $rc for games on $a"
+done
+out=$(timeout 5 /usr/local/bin/gamescope-headless.sh 2>&1 || true)
+[[ "$out" == *"refusing to start"* ]] && ok "launcher refuses to run outside the fenced slice" || fail "launcher started outside the fenced slice: $out"
 
 SS=sunshine.service
 [ "$(in_unit $SS 'ls -A /home')" = gamer ] && ok "sunshine sees only /home/gamer" || fail "sunshine can see other homes"
@@ -107,6 +130,9 @@ grep -q "modes.cfg .* SAMSUNG:${default}\$" /etc/tmpfiles.d/gamer.conf \
   && ok "boot default matches stream-mode default ($default)" || fail "tmpfiles boot mode differs from stream-mode DEFAULT_MODE ($default)"
 last=$(sudo journalctl -u sunshine -b --no-pager -o cat | grep -E "CLIENT (CONNECTED|DISCONNECTED)" | tail -1) || true
 if [ -e /etc/gamescope-headless/resolution ]; then
+  . /etc/gamescope-headless/resolution
+  live=$(sudo grep -ao 'selecting mode [0-9]*x[0-9]*@[0-9]*' /home/gamer/.local/state/gamescope-headless.log | tail -1)
+  [ "$live" = "selecting mode ${GS_W}x${GS_H}@${GS_R}" ] && ok "pinned mode ${GS_W}x${GS_H}@${GS_R} is live" || fail "pin is ${GS_W}x${GS_H}@${GS_R} but gamescope logged: $live"
   warn "mode pinned by stream-res; skipping the live switch test"
 elif [[ "$last" == *"CLIENT CONNECTED"* ]]; then
   warn "a client is connected; skipping the live switch test"
@@ -128,7 +154,9 @@ sudo grep -qaF "Running script file '/etc/gamescope/scripts/50-stream-hdr.lua'" 
 hdr_prop() { in_unit $SS "DISPLAY=:0 xprop -root $1" | grep -o '[0-9]*$'; }
 hdr_out() { echo "$(hdr_prop GAMESCOPE_DISPLAY_SUPPORTS_HDR)$(hdr_prop GAMESCOPE_HDR_OUTPUT_FEEDBACK)"; }
 if [ -e /etc/gamescope-headless/hdr ]; then
-  warn "HDR policy is '$(cat /etc/gamescope-headless/hdr)'; skipping the SDR default and live HDR tests"
+  pol=$(cat /etc/gamescope-headless/hdr)
+  [ "$pol" != on ] || { [ "$(hdr_out)" = 11 ] && ok "HDR policy on: gamescope outputs HDR" || fail "HDR policy on but gamescope reports $(hdr_out)"; }
+  warn "HDR policy is '$pol'; skipping the SDR default and live HDR tests"
 elif [ "$(hdr_out)" != 00 ]; then
   fail "no HDR policy but gamescope offers or outputs HDR ($(hdr_out))"
 else
