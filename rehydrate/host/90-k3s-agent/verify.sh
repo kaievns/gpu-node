@@ -14,5 +14,5 @@ grep -q 'http://172.16.1.89/v2' /etc/rancher/k3s/registries.yaml \
   && ok "registry.homelab HTTP mirror configured" || fail "registries.yaml missing the homelab mirror"
 
 # k3s auto-detected nvidia runtimes
-sudo journalctl -u k3s-agent --no-pager 2>/dev/null | grep -q 'Found nvidia container runtime' \
-  && ok "k3s auto-detected nvidia runtime" || warn "no nvidia auto-detect log (yet?)"
+sudo grep -q "runtimes.'nvidia'\]" /var/lib/rancher/k3s/agent/etc/containerd/config.toml \
+  && ok "containerd has the nvidia runtime" || fail "nvidia runtime missing from k3s containerd config"
