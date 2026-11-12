@@ -278,6 +278,7 @@ first.
 |---|---|---|
 | Titanfall 2 | `DISABLE_GAMESCOPE_WSI=1 %command%`, Proton Experimental | gamescope 3.16.31's WSI layer crashes the EA app in `vkGetPhysicalDeviceSurfaceFormats2KHR` (null call, `c0000005 in Unix call`). The game then fails with "Failed to get Origin environment setting: The Origin desktop application is not loaded". Same crash on GE-Proton and Valve Proton; fine on 3.16.28. |
 | Pragmata | `%command% /WineDetectionEnabled:False` | The RE Engine detects Wine and greys out Ray Tracing and Path Tracing. The switch turns the check off; ray tracing then runs on GE-Proton11-7 (tested in the hub, walking, no freeze). Set them from the title screen; in-game they're locked. Path tracing also needs DLSS upscaling + Ray Reconstruction. |
+| Shadow of the Tomb Raider | Windows build on Proton 10, not the native Feral port | The native port calls a Vulkan function, gets an error and aborts itself (7 SIGABRT dumps in Oct, one with Xid 109). It crashed repeatedly at the same Kuwaq Yaku checkpoint. The Windows build ran that checkpoint for 6+ min. The builds keep separate saves: native in `~/.local/share/feral-interactive/Shadow of the Tomb Raider/SaveData/<steamid>/`, Windows in the prefix's `Documents/Shadow of the Tomb Raider/<steamid>/`. Copying `save*.dat` (not `profile.dat`) across works. They share the 35 GB content depot, so switching downloads 1.4 GB. |
 
 Titanfall 2 campaign: **Continue** can crash on some checkpoints (seen mid
 Blood and Rust, inside BT). Restoring the save sets auto-exposure through
