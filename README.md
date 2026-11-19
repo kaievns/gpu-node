@@ -59,7 +59,7 @@ stateDiagram-v2
 
 The controller is a small bash + kubectl + python3 loop in a Deployment
 (details in [cluster/controller/](cluster/controller/)). The host-side agent
-is the authoritative gate: it refuses a compute flip while a Moonlight client
+has the final say: it refuses a compute flip while a Moonlight client
 is mid-stream, because yanking the GPU kills NVENC under the running game.
 
 ## Repo map
@@ -101,7 +101,7 @@ Three layers, outermost first:
    watches for.
 3. **`EXCLUSIVE_PROCESS` compute mode** — set by `gpu-profile compute` as
    defense in depth: even if scheduling goes wrong, a second CUDA context
-   can't co-tenant the GPU. The taints are the primary gate, not this.
+   can't co-tenant the GPU. The taints are the primary block, not this.
 
 The one deliberate exception: **dcgm-exporter tolerates all taints**, so GPU
 telemetry flows in both modes — which is how the thermal forensics in the
@@ -170,6 +170,10 @@ The differentiating content of this repo is the write-ups, not the YAML:
   Root cause: GDDR6X memory-junction heat-soak in a closed SFF compartment,
   invisible because consumer Ampere doesn't expose memory temperature and the
   die read a comfortable 65 °C while the memory cooked.
+- [docs/lessons/xid109-game-marks-gpu-unhealthy.md](docs/lessons/xid109-game-marks-gpu-unhealthy.md)
+  — GPU jobs Pending for 5 days on a healthy, awake node. A game's own
+  context timeout (Xid 109) made device plugin v0.17.0 mark the GPU
+  unhealthy until restart. Tell: allocatable 0 with capacity 1.
 - [docs/streaming.md](docs/streaming.md) — why Steam Remote Play on Linux
   silently degrades to a ~20 fps desktop grab for most Vulkan/Proton titles,
   and the replacement: kernel-injected Steam Deck EDID → headless

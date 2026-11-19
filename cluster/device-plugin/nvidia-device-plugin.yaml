@@ -9,6 +9,8 @@
 #     capacity never registers and compute pods stay Pending forever.
 #   - nodeSelector: gpu.model=rtx5080 (only schedules on gpu-node)
 #   - runtimeClassName: nvidia (so the runtime injects /dev/nvidia* + libs)
+#   - image v0.17.1 or newer: v0.17.0 marks the GPU unhealthy on Xid 109,
+#     which games raise. See docs/lessons/xid109-game-marks-gpu-unhealthy.md
 apiVersion: node.k8s.io/v1
 kind: RuntimeClass
 metadata:
@@ -40,7 +42,7 @@ spec:
       runtimeClassName: nvidia
       containers:
         - name: nvidia-device-plugin-ctr
-          image: nvcr.io/nvidia/k8s-device-plugin:v0.17.0
+          image: nvcr.io/nvidia/k8s-device-plugin:v0.17.4
           env:
             - {name: FAIL_ON_INIT_ERROR, value: "false"}
           securityContext:
