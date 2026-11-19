@@ -51,7 +51,7 @@ spec:
               # threat model; add the .sha256 check if yours differs.
               if ! [ -x /usr/local/bin/kubectl ]; then
                 curl -fsSL -o /usr/local/bin/kubectl \
-                  "https://dl.k8s.io/release/v1.33.7/bin/linux/amd64/kubectl"
+                  "https://dl.k8s.io/release/v1.37.2/bin/linux/amd64/kubectl"
                 chmod +x /usr/local/bin/kubectl
               fi
               exec bash /scripts/controller.sh

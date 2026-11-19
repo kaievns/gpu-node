@@ -4,13 +4,13 @@
 # Requires env vars (or interactive prompt):
 #   K3S_URL    : e.g. https://172.16.1.1:6443
 #   K3S_TOKEN  : node-token from control plane (cat /var/lib/rancher/k3s/server/node-token)
-#   K3S_VERSION (optional, defaults to v1.33.7+k3s3 to match the cluster)
+#   K3S_VERSION (optional, defaults to v1.37.2+k3s1 to match the cluster)
 set -euo pipefail
 . "$(dirname "$0")/../../lib/common.sh"
 
 K3S_URL="${K3S_URL:-}"
 K3S_TOKEN="${K3S_TOKEN:-}"
-K3S_VERSION="${K3S_VERSION:-v1.33.7+k3s3}"
+K3S_VERSION="${K3S_VERSION:-v1.37.2+k3s1}"
 
 if [ -z "$K3S_URL" ]; then
   read -r -p "K3S_URL (e.g. https://172.16.1.1:6443): " K3S_URL
