@@ -151,10 +151,9 @@ to change — there is no templating layer, on purpose:
 | k3s API servers | `https://172.16.1.1/.2/.3:6443` | prompted by [rehydrate/host/90-k3s-agent/install.sh](rehydrate/host/90-k3s-agent/install.sh), [docs/setup.md](docs/setup.md) |
 
 **No secrets are tracked.** Exactly two exist, and both live only outside
-git: the agent bearer token (`/etc/gaming-agent/token` on the host plus a k8s
-Secret in `gpu-node-system` — generation recipe in
-[host/etc/gaming-agent/token.example](host/etc/gaming-agent/token.example)
-and [cluster/controller/03-secret.yaml.example](cluster/controller/03-secret.yaml.example)),
+git: the agent bearer token (`AGENT_TOKEN` in the ignored `.env`, installed to
+`/etc/gaming-agent/token` on the host and to a k8s Secret in `gpu-node-system`;
+[.env.example](.env.example) has the recipe),
 and Sunshine's credentials/pairing state (`sunshine_state.json`, deliberately
 never synced into the repo). The k3s join token is never written anywhere
 here either.

@@ -217,12 +217,12 @@ it:
    K3S_URL=https://172.16.1.1:6443 K3S_TOKEN=<node-token> ./rehydrate.sh host
    ```
    The token is never written to the repo or to disk outside k3s's own state.
-2. **gaming-agent bearer token** — you do *not* bring this one; stage
-   `host/85-gaming-agent` generates a fresh `openssl rand -hex 32` at
-   `/etc/gaming-agent/token` (640 `root:gaming-agent`), or reuses an existing
-   one. It's handed to the cluster side via a transient
-   `/tmp/.gpu-node-agent-token` (or SSH-fetched, or `AGENT_TOKEN` env) when
-   `cluster/30-controller` creates the k8s Secret.
+2. **gaming-agent bearer token** — `AGENT_TOKEN` in the repo-root `.env`,
+   which git ignores. Copy `.env.example` to `.env` and fill it with
+   `openssl rand -hex 32`, or with the current token on a rebuild. Stage
+   `host/85-gaming-agent` installs it at `/etc/gaming-agent/token` (640
+   `root:gaming-agent`), and `cluster/30-controller` creates the k8s Secret
+   from the same value. Both checkouts need the same `.env`.
 3. **Sunshine credentials + pairing state** — `sunshine_state.json` (web
    creds, paired-client certs) is deliberately never in the repo. After the
    gaming stack is up: open `https://172.16.1.220:47990`, set the web
@@ -233,13 +233,17 @@ it:
 
 ```bash
 # On gpu-node:
-git clone <this-repo> ~/gpu-node && cd ~/gpu-node/rehydrate
+git clone <this-repo> ~/gpu-node && cd ~/gpu-node
+cp .env.example .env && $EDITOR .env      # AGENT_TOKEN
+cd rehydrate
 K3S_URL=https://172.16.1.1:6443 K3S_TOKEN=<token> ./rehydrate.sh host
 sudo reboot     # host/20-boot changed the kernel cmdline — see §6 FIRST
 ./rehydrate.sh host verify
 
 # From your kubectl machine (NOT the box):
-git clone <this-repo> && cd gpu-node/rehydrate
+git clone <this-repo> && cd gpu-node
+cp .env.example .env && $EDITOR .env      # the same AGENT_TOKEN as on the box
+cd rehydrate
 ./rehydrate.sh cluster            # install + verify
 ```
 
@@ -248,8 +252,9 @@ that tree is the source of truth, kept current from the live box with
 [`scripts/sync-from-host.sh`](../scripts/sync-from-host.sh). If you've made
 changes on the host since the last sync, sync before you trust a rebuild.
 
-`cluster/30-controller` needs the agent token from `host/85` — run the host
-side first, or export `AGENT_TOKEN` yourself.
+`host/85` and `cluster/30-controller` each stop when `.env` has no usable
+`AGENT_TOKEN`. Their verify steps fail when the host file or the Secret holds
+a different value.
 
 ### Post-checks
 

@@ -10,9 +10,8 @@
 # explicit destination paths, no -R anywhere.
 #
 # Deliberately NOT pulled into host/:
-#   - /etc/gaming-agent/token — secret. Regenerate on restore:
-#       openssl rand -hex 32 | sudo tee /etc/gaming-agent/token
-#     and update the matching k8s Secret (gpu-node-controller-secret).
+#   - /etc/gaming-agent/token — secret. Its source is AGENT_TOKEN in the
+#     repo-root .env; rehydrate host/85 and cluster/30 install it on restore.
 #   - /home/gamer/.config/sunshine/sunshine_state.json — Sunshine creds + client
 #     pairings. Never in git; pair fresh on restore.
 #   - HRTF binaries (MIT_KEMAR_normal_pinna.sofa, oal+++.wav, ir_*.wav) —

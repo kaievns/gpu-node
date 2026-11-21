@@ -12,6 +12,8 @@
 #   warn <msg>                 — yellow [WARN] line, non-fatal
 #   die <msg>                  — error + exit 1 (install.sh)
 #   require <cmd>...           — exit if <cmd> not in PATH
+#   require_agent_token        — load $ENV_FILE, exit unless AGENT_TOKEN is usable
+#   agent_token_stale <file>   — true when <file> does not hold $AGENT_TOKEN
 #   ensure_pkg <pkg>...        — pacman install if missing
 #   ensure_aur_pkg <pkg>...    — yay install if missing (needs yay already)
 #   install_file <mode> <owner:group> <src-relative-to-payload> <target>
@@ -28,7 +30,9 @@ REHYDRATE_DIR="$(cd "$(dirname "$__src")/.." && pwd)"
 REPO_ROOT="$(cd "$REHYDRATE_DIR/.." && pwd)"
 # host/ is the tracked, curated host-config payload (filesystem-mirror layout).
 PAYLOAD_DIR="${PAYLOAD_DIR:-$REPO_ROOT/host}"
-export REPO_ROOT REHYDRATE_DIR PAYLOAD_DIR
+# Secrets live in the ignored $REPO_ROOT/.env; .env.example lists them.
+ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env}"
+export REPO_ROOT REHYDRATE_DIR PAYLOAD_DIR ENV_FILE
 
 # Colors only if stdout is a TTY.
 if [ -t 1 ]; then
@@ -47,6 +51,21 @@ require() {
   for c in "$@"; do
     command -v "$c" >/dev/null 2>&1 || die "missing required command: $c"
   done
+}
+
+require_agent_token() {
+  if [ -f "$ENV_FILE" ]; then
+    # shellcheck disable=SC1090
+    . "$ENV_FILE"
+  fi
+  [ -n "${AGENT_TOKEN:-}" ] || die "AGENT_TOKEN is not set: copy .env.example to .env and fill it in"
+  [ "${#AGENT_TOKEN}" -ge 32 ] || die "AGENT_TOKEN is shorter than 32 characters"
+}
+
+agent_token_stale() {
+  local current
+  current=$(cat "$1" 2>/dev/null || sudo cat "$1" 2>/dev/null || true)
+  [ "$current" != "$AGENT_TOKEN" ]
 }
 
 ensure_pkg() {

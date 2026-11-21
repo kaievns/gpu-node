@@ -95,7 +95,7 @@ Deployment, the 5-min cooldown starts.
 
 ```bash
 # From your laptop:
-TOKEN=$(ssh kai@172.16.1.220 'sudo cat /etc/gaming-agent/token')
+TOKEN=$(. ./.env && echo "$AGENT_TOKEN")   # from the repo root
 curl -X POST -H "Authorization: Bearer $TOKEN" http://172.16.1.220:8080/mode/gaming
 kubectl taint nodes gpu-node mode=gaming:NoSchedule --overwrite
 ```

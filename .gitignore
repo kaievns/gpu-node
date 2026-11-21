@@ -8,6 +8,9 @@
 # GPU purchase research, etc). Kept locally, not part of the public repo.
 /notes/
 
+# Secrets: copy .env.example to .env
+/.env
+
 # Misc
 .DS_Store
 *.swp

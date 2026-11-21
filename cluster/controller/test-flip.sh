@@ -18,13 +18,15 @@ set -euo pipefail
 NS=gpu-node-system
 NODE=gpu-node
 AGENT_URL=${AGENT_URL:-http://172.16.1.220:8080}
-GPU_NODE_SSH=${GPU_NODE_SSH:-kai@172.16.1.220}
+ENV_FILE=${ENV_FILE:-$(cd "$(dirname "$0")/../.." && pwd)/.env}
 
 step() { echo; echo "═══════ $* ═══════"; }
 
 step "0. Prereq check — controller running, agent reachable"
 kubectl -n "$NS" rollout status deployment/gpu-node-controller --timeout=30s
-TOKEN=$(ssh "$GPU_NODE_SSH" 'sudo cat /etc/gaming-agent/token')
+[ -f "$ENV_FILE" ] || { echo "missing $ENV_FILE: copy .env.example to .env and fill it in" >&2; exit 1; }
+. "$ENV_FILE"
+TOKEN=${AGENT_TOKEN:?AGENT_TOKEN is not set in .env}
 curl -fsS -H "Authorization: Bearer $TOKEN" "$AGENT_URL/status" | python3 -m json.tool
 
 step "1. Apply test GPU pod (will be Pending until controller flips)"

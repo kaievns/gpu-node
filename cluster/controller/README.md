@@ -31,7 +31,7 @@ box is in gaming mode.
 On the host side, a flip runs `gpu-profile` (v4.0): both modes run the card's max PL with
 the core boost ceiling lifted; **compute** additionally sets
 `EXCLUSIVE_PROCESS` as defense in depth against accidental co-tenant CUDA
-contexts (the taint is the primary gate), while **gaming** runs `DEFAULT`.
+contexts (the taint is the primary block), while **gaming** runs `DEFAULT`.
 The agent enforces ordering — the gaming stack is stopped *before* the switch
 to `EXCLUSIVE_PROCESS`, since flipping under a live Sunshine stream kills
 NVENC.
@@ -42,7 +42,7 @@ NVENC.
 |---|---|
 | `01-namespace.yaml` | `gpu-node-system` namespace |
 | `02-rbac.yaml` | ServiceAccount + ClusterRole (nodes get/list/watch/patch + pods get/list/watch) + binding |
-| `03-secret.yaml.example` | Template only. The real Secret holds the bearer token shared with the host-side agent — **create via `kubectl create secret` from the host's `/etc/gaming-agent/token`, never commit a populated copy** |
+| (no `03` file) | The Secret `gpu-node-controller-secret` holds the bearer token shared with the host-side agent. `rehydrate/cluster/30-controller` creates it from `AGENT_TOKEN` in the repo-root `.env` (ignored by git; see `.env.example`) |
 | `04-configmap.yaml` | `controller.sh` (the loop) |
 | `05-deployment.yaml` | 1 replica, `hostNetwork: true` (for WOL broadcast), affinity = NOT on gpu-node, image `alpine:3.20` + apk install bash/curl/jq/python3 + download kubectl |
 
@@ -65,17 +65,16 @@ NVENC.
 #   - device plugin running (../device-plugin/nvidia-device-plugin.yaml)
 #   - host-side gaming-agent listening on :8080 (../../host/opt/gaming-agent/)
 
-# Generate the shared token on the host (if not already):
-ssh kai@172.16.1.220 'sudo cat /etc/gaming-agent/token' > /tmp/token
+# The shared token is AGENT_TOKEN in the repo-root .env (see .env.example):
+. ../../.env
 
 # Apply the cluster pieces:
 kubectl apply -f 01-namespace.yaml
 kubectl apply -f 02-rbac.yaml
 kubectl -n gpu-node-system create secret generic gpu-node-controller-secret \
-    --from-literal=agent-token="$(cat /tmp/token)"
+    --from-literal=agent-token="$AGENT_TOKEN"
 kubectl apply -f 04-configmap.yaml
 kubectl apply -f 05-deployment.yaml
-rm /tmp/token
 ```
 
 ## Failure mode
@@ -100,7 +99,7 @@ kubectl taint nodes gpu-node mode-
 kubectl taint nodes gpu-node mode=gaming:NoSchedule --overwrite
 
 # Call agent directly
-TOKEN=$(ssh kai@172.16.1.220 'sudo cat /etc/gaming-agent/token')
+TOKEN=$(. ./.env && echo "$AGENT_TOKEN")   # from the repo root
 curl -H "Authorization: Bearer $TOKEN" http://172.16.1.220:8080/status
 curl -X POST -H "Authorization: Bearer $TOKEN" http://172.16.1.220:8080/mode/compute
 curl -X POST -H "Authorization: Bearer $TOKEN" http://172.16.1.220:8080/mode/gaming

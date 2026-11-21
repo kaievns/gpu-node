@@ -41,16 +41,17 @@ Or single-step `./rehydrate.sh host` (install then verify) and `./rehydrate.sh c
 |---|---|---|
 | `K3S_URL` | host/90 | Cluster API endpoint, e.g. `https://172.16.1.1:6443` |
 | `K3S_TOKEN` | host/90 | Node-token from a control-plane node (`cat /var/lib/rancher/k3s/server/node-token`). Never written to disk by these scripts. |
-| `AGENT_TOKEN` | cluster/30 | Shared bearer token between controller and host agent. Normally you don't set this — see the token flow below. |
+| `AGENT_TOKEN` | host/85, cluster/30 | Shared bearer token between controller and host agent. Not prompted: read from the repo-root `.env`, see the token flow below. |
 
 ### The agent-token flow
 
-`host/85` generates a fresh token into `/etc/gaming-agent/token` (mode 640,
-root:gaming-agent) and drops a transient copy at `/tmp/.gpu-node-agent-token`
-(born 0600). `cluster/30` resolves the token in this order: `$AGENT_TOKEN` env
-→ the `/tmp` file (same-machine runs) → `ssh kai@172.16.1.220 'sudo cat
-/etc/gaming-agent/token'` → interactive prompt. It writes the k8s Secret, then
-deletes the `/tmp` copy. The token never lands in the repo.
+The token is `AGENT_TOKEN` in the repo-root `.env`, which git ignores. Copy
+`.env.example` to `.env` and fill it in before the first run. `host/85` writes
+the value to `/etc/gaming-agent/token` (mode 640, root:gaming-agent) when the
+host copy differs, and restarts the agent in that case. `cluster/30` writes the
+same value to the k8s Secret. When the two stages run on different machines,
+both checkouts need the same `.env`. Without `.env`, an exported `AGENT_TOKEN`
+is used. `lib/test-agent-token.sh` tests the lookup.
 
 ## Sections
 
@@ -84,7 +85,7 @@ Manifests live in [`../cluster/`](../cluster/): `controller/`,
   re-run", not "no-op when converged" — some sections restart services on
   every run.
 - **`verify.sh`** is read-only — confirms one or more invariants per section.
-  Exit code 0 if all pass, non-zero if any fail. Verify is the gate: an
+  Exit code 0 if all pass, non-zero if any fail. Verify is the deciding check: an
   install that "completed" but doesn't verify is not done. Some checks are
   deliberately warn-only (boot-order timing, WOL BIOS-side state, UUID
   mismatch) — read the yellow lines.

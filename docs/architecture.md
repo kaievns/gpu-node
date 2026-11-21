@@ -23,13 +23,13 @@ This isn't a "be polite, share the GPU" arrangement. Hard reasons:
   `compute_mode=EXCLUSIVE_PROCESS`; if that flips while Sunshine is
   streaming, Sunshine's NVENC session is yanked and the stream falls back to
   libx264 or dies, taking the running game with it. The agent is the
-  authoritative gate: `/mode/compute` returns `409` if a Moonlight client is
+  authoritative check: `/mode/compute` returns `409` if a Moonlight client is
   mid-stream, and the controller independently defers the flip. The order is
   always *stop the gaming stack, then change compute mode*.
 - **10GB of VRAM is not enough for two tenants.** A game co-resident with a
   training job OOMs one or both. Training also wants deterministic
   throughput; a compositor + encoder stealing SMs ruins both experiences.
-- **EXCLUSIVE_PROCESS in compute is defense in depth, not the gate.** The
+- **EXCLUSIVE_PROCESS in compute is defense in depth, not the block.** The
   taint-level mutual exclusion (below) is the primary mechanism; the compute
   mode setting just prevents a second accidental CUDA context if something
   slips past it.
@@ -154,7 +154,7 @@ sequenceDiagram
     end
 ```
 
-The agent double-checks the stream gate itself (409 if a client is
+The agent re-checks for a live stream itself (409 if a client is
 connected) — the controller deferring is a courtesy, the agent refusing is
 the guarantee.
 
@@ -222,7 +222,7 @@ Everything the controller does, you can do by hand:
 
 ```bash
 # Talk to the agent directly (from the 172.16.1.x network):
-TOKEN=$(ssh kai@172.16.1.220 'sudo cat /etc/gaming-agent/token')
+TOKEN=$(. ./.env && echo "$AGENT_TOKEN")   # from the repo root
 curl -fsS -H "Authorization: Bearer $TOKEN" http://172.16.1.220:8080/status
 curl -fsS -X POST -H "Authorization: Bearer $TOKEN" http://172.16.1.220:8080/mode/compute
 curl -fsS -X POST -H "Authorization: Bearer $TOKEN" http://172.16.1.220:8080/mode/gaming
@@ -303,12 +303,12 @@ Load-bearing details:
 Homelab threat model: protect against accidents and over-curious LAN
 devices, not nation-states. Layers, narrowest first:
 
-- **Bearer token** — `openssl rand -hex 32`, generated on the host at
-  install (rehydrate `host/85`). Lives in exactly two places:
-  `/etc/gaming-agent/token` on the host (`640 root:gaming-agent`) and the
-  `gpu-node-controller-secret` k8s Secret on the cluster. Never in the repo
-  ([`03-secret.yaml.example`](../cluster/controller/03-secret.yaml.example)
-  is a template). The agent speaks plain HTTP on the LAN — the token gates
+- **Bearer token** — `openssl rand -hex 32`, kept as `AGENT_TOKEN` in the
+  repo-root `.env`, which git ignores ([`.env.example`](../.env.example) is
+  the template). Rehydrate installs it in two places:
+  `/etc/gaming-agent/token` on the host (`640 root:gaming-agent`, stage
+  `host/85`) and the `gpu-node-controller-secret` k8s Secret on the cluster
+  (stage `cluster/30`). The agent speaks plain HTTP on the LAN — the token decides
   *who can flip modes*, it is not transport secrecy.
 - **Agent privilege** — `gaming-agent` is a nologin system user. Its sudoers
   entry ([`host/etc/sudoers.d/gaming-agent`](../host/etc/sudoers.d/gaming-agent))
